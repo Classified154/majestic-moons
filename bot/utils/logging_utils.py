@@ -9,9 +9,9 @@ if not Path.exists(LOG_DIR):
     Path.mkdir(LOG_DIR)
 
 COLOR_DICT = {
-    "GREEN": 0x46fa76,
-    "RED": 0xfc3a4e,
-    "YELLOW": 0xfcf765,
+    "GREEN": 0x46FA76,
+    "RED": 0xFC3A4E,
+    "YELLOW": 0xFCF765,
 }
 
 

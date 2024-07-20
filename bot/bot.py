@@ -64,18 +64,19 @@ class MyBot(commands.Bot):
             exe = await cur.execute(query, tuple(values))
             return await exe.fetchmany(size)
 
-    async def fetch(self, query: str,  *values: object) -> list:
+    async def fetch(self, query: str, *values: object) -> list:
         """Fetch all rows."""
         async with aiosqlite.connect(self.db_path) as db, db.cursor() as cur:
             exe = await cur.execute(query, tuple(values))
             return await exe.fetchall()
 
 
-bot = MyBot(command_prefix="!",
-            intents=INTENTS,
-            test_guilds=[1263028897256312872],
-            help_command=None,
-            )
+bot = MyBot(
+    command_prefix="!",
+    intents=INTENTS,
+    test_guilds=[1263028897256312872],
+    help_command=None,
+)
 
 
 @bot.event
@@ -89,9 +90,9 @@ async def on_ready() -> None:
 async def reload(ctx: commands.Context, extension: str) -> None:
     """Reload an extension."""
     bot.reload_extension(f"cogs.{extension}")
-    await ctx.send(embed=disnake.Embed(
-        description=f"`{extension.upper()}` reloaded!",
-        color=disnake.Color.dark_gold()))
+    await ctx.send(
+        embed=disnake.Embed(description=f"`{extension.upper()}` reloaded!", color=disnake.Color.dark_gold()),
+    )
 
 
 @bot.command()
@@ -99,9 +100,7 @@ async def reload(ctx: commands.Context, extension: str) -> None:
 async def load(ctx: commands.Context, extension: str) -> None:
     """Load an extension."""
     bot.load_extension(f"cogs.{extension}")
-    await ctx.send(embed=disnake.Embed(
-        description=f"`{extension.upper()}` loaded!",
-        color=disnake.Color.dark_gold()))
+    await ctx.send(embed=disnake.Embed(description=f"`{extension.upper()}` loaded!", color=disnake.Color.dark_gold()))
 
 
 for file in os.listdir(bot.cog_path):

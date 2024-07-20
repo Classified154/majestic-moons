@@ -4,10 +4,10 @@ from time import time
 import disnake
 from disnake.ext import commands
 
-C_Help = 0xfb3e8f
-C_CommandHelp = 0xd70055
-C_Nothing = 0xf05454
-C_Error = 0xcc0b0b
+C_Help = 0xFB3E8F
+C_CommandHelp = 0xD70055
+C_Nothing = 0xF05454
+C_Error = 0xCC0B0B
 
 
 class Help(commands.Cog):
@@ -17,7 +17,7 @@ class Help(commands.Cog):
         self.bot = bot
 
     # @commands.Cog.listener()
-    async def on_slash_command_error(self, inter: disnake.CommandInteraction, error: commands.CommandError ) -> None:
+    async def on_slash_command_error(self, inter: disnake.CommandInteraction, error: commands.CommandError) -> None:
         """Error handler for slash commands."""
         if isinstance(error, commands.CommandOnCooldown):
             try:
@@ -59,7 +59,7 @@ class Help(commands.Cog):
             embed = disnake.Embed(
                 title="Error",
                 description=f"Author : {inter.author.mention} \n\n Command : `/{inter.data.name}` "
-                            f"\n\n```Python\n{traceback_text[:3500]}```",
+                f"\n\n```Python\n{traceback_text[:3500]}```",
                 color=disnake.Color(C_Nothing),
             )
             await er_channel.send(embed=embed)
