@@ -1,3 +1,5 @@
 disnake
 aiosqlite==0.17.0
 python-dotenv==0.18.0
+ruff~=0.5.0
+pre-commit~=3.7.1

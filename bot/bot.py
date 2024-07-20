@@ -1,6 +1,7 @@
-import disnake
 import os
+
 import aiosqlite
+import disnake
 from disnake.ext import commands
 from dotenv import load_dotenv
 
@@ -14,58 +15,60 @@ INTENTS.message_content = True
 
 
 class MyBot(commands.Bot):
-    def __init__(self, *args, **kwargs):
+    """Custom Bot class."""
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super().__init__(*args, **kwargs)
         self.db_path = "main.sqlite"
         self.cog_path = "./cogs"
 
-    async def commit(self):
+    async def commit(self) -> None:
+        """Commit the database."""
         async with aiosqlite.connect(self.db_path) as db:
             await db.commit()
 
-    async def execute(self, query, *values):
+    async def execute(self, query: str, *values: object) -> None:
+        """Execute a query."""
         async with aiosqlite.connect(self.db_path) as db:
             async with db.cursor() as cur:
                 await cur.execute(query, tuple(values))
             await db.commit()
 
-    async def executemany(self, query, values):
+    async def executemany(self, query: str, values: tuple) -> None:
+        """Execute many queries."""
         async with aiosqlite.connect(self.db_path) as db:
             async with db.cursor() as cur:
                 await cur.executemany(query, values)
             await db.commit()
 
-    async def fetchval(self, query, *values):
+    async def fetchval(self, query: str, *values: str) -> str:
+        """Fetch a single value."""
         async with aiosqlite.connect(self.db_path) as db:
             async with db.cursor() as cur:
                 exe = await cur.execute(query, tuple(values))
                 val = await exe.fetchone()
             return val[0] if val else None
 
-    async def fetchrow(self, query, *values):
+    async def fetchrow(self, query: str, *values: object) -> list:
+        """Fetch a single row."""
         async with aiosqlite.connect(self.db_path) as db:
             async with db.cursor() as cur:
                 exe = await cur.execute(query, tuple(values))
                 row = await exe.fetchmany(size=1)
-            if len(row) > 0:
-                row = [r for r in row[0]]
-            else:
-                row = None
+            row: list = list(row[0]) if len(row) > 0 else None
             return row
 
-    async def fetchmany(self, query, size, *values):
-        async with aiosqlite.connect(self.db_path) as db:
-            async with db.cursor() as cur:
-                exe = await cur.execute(query, tuple(values))
-                many = await exe.fetchmany(size)
-            return many
+    async def fetchmany(self, query: str, size: int, *values: object) -> list:
+        """Fetch many rows."""
+        async with aiosqlite.connect(self.db_path) as db, db.cursor() as cur:
+            exe = await cur.execute(query, tuple(values))
+            return await exe.fetchmany(size)
 
-    async def fetch(self, query, *values):
-        async with aiosqlite.connect(self.db_path) as db:
-            async with db.cursor() as cur:
-                exe = await cur.execute(query, tuple(values))
-                all_rows = await exe.fetchall()
-            return all_rows
+    async def fetch(self, query: str,  *values: object) -> list:
+        """Fetch all rows."""
+        async with aiosqlite.connect(self.db_path) as db, db.cursor() as cur:
+            exe = await cur.execute(query, tuple(values))
+            return await exe.fetchall()
 
 
 bot = MyBot(command_prefix="!",
@@ -76,14 +79,15 @@ bot = MyBot(command_prefix="!",
 
 
 @bot.event
-async def on_ready():
+async def on_ready() -> None:
+    """Bot is ready."""
     print(f"Logged in as {bot.user} (ID: {bot.user.id})\n------")
 
 
 @bot.command()
 @commands.has_permissions(administrator=True)
-async def reload(ctx, extension):
-    """Reload an extension"""
+async def reload(ctx: commands.Context, extension: str) -> None:
+    """Reload an extension."""
     bot.reload_extension(f"cogs.{extension}")
     await ctx.send(embed=disnake.Embed(
         description=f"`{extension.upper()}` reloaded!",
@@ -92,8 +96,8 @@ async def reload(ctx, extension):
 
 @bot.command()
 @commands.has_permissions(administrator=True)
-async def load(ctx, extension):
-    """Load an extension"""
+async def load(ctx: commands.Context, extension: str) -> None:
+    """Load an extension."""
     bot.load_extension(f"cogs.{extension}")
     await ctx.send(embed=disnake.Embed(
         description=f"`{extension.upper()}` loaded!",

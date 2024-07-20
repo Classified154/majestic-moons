@@ -1,64 +1,45 @@
 import logging
-import os
 from logging.handlers import TimedRotatingFileHandler
+from pathlib import Path
 
+FORMATTER = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+LOG_DIR = Path("./logs")
 
-FORMATTER = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s", datefmt='%Y-%m-%d %H:%M:%S')
-LOG_DIR = "./logs"
-if not os.path.exists(LOG_DIR):
-    os.makedirs(LOG_DIR)
+if not Path.exists(LOG_DIR):
+    Path.mkdir(LOG_DIR)
 
 COLOR_DICT = {
-  "GREEN": 0x46fa76,
-  "RED": 0xfc3a4e,
-  "YELLOW": 0xfcf765
+    "GREEN": 0x46fa76,
+    "RED": 0xfc3a4e,
+    "YELLOW": 0xfcf765,
 }
 
 
-class CustomFormatter(logging.Formatter):
-
-    grey = "\x1b[38;20m"
-    yellow = "\x1b[33;20m"
-    red = "\x1b[31;20m"
-    bold_red = "\x1b[31;1m"
-    reset = "\x1b[0m"
-    format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s (%(filename)s:%(lineno)d)"
-
-    FORMATS = {
-        logging.DEBUG: grey + format + reset,
-        logging.INFO: grey + format + reset,
-        logging.WARNING: yellow + format + reset,
-        logging.ERROR: red + format + reset,
-        logging.CRITICAL: bold_red + format + reset
-    }
-
-    def format(self, record):
-        log_fmt = self.FORMATS.get(record.levelno)
-        formatter = logging.Formatter(log_fmt)
-        return formatter.format(record)
-
-
-def get_console_handler():
+def get_console_handler() -> logging.StreamHandler:
+    """Return a console handler."""
     console_handler = logging.StreamHandler()
-    console_handler.setFormatter(CustomFormatter())
+    console_handler.setFormatter(logging.Formatter())
     return console_handler
 
 
-def ensure_dir(directory):
-    if not os.path.exists(directory):
-        os.makedirs(directory)
+def ensure_dir(directory: Path) -> None:
+    """Ensure the directory exists."""
+    if not Path.exists(directory):
+        Path.mkdir(directory)
 
 
-def get_file_handler(logger_name):
-    log_folder = os.path.join(LOG_DIR, logger_name)
+def get_file_handler(logger_name: str) -> logging.FileHandler:
+    """Return a file handler."""
+    log_folder = Path.joinpath(LOG_DIR, logger_name)
     ensure_dir(log_folder)
-    log_file = os.path.join(log_folder, f"{logger_name}.log")
-    file_handler = TimedRotatingFileHandler(log_file, when='W0', utc=True, encoding="utf-8")
+    log_file = Path.joinpath(log_folder, f"{logger_name}.log")
+    file_handler = TimedRotatingFileHandler(log_file, when="W0", utc=True, encoding="utf-8")
     file_handler.setFormatter(FORMATTER)
     return file_handler
 
 
-def get_logger(logger_name):
+def get_logger(logger_name: str) -> logging.Logger:
+    """Return a logger."""
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.DEBUG)
     logger.addHandler(get_console_handler())
@@ -77,7 +58,8 @@ def get_logger(logger_name):
 LOGGER = get_logger("main")
 
 
-def log(user_id, log_type, text, level="INFO", logger=LOGGER):
+def log(user_id: int, log_type: str, text: str, level: str = "INFO", logger: logging.Logger = LOGGER) -> None:
+    """Log a message."""
     text = str(user_id) + " | " + log_type + " | " + text
 
     if level == "INFO":
