@@ -13,6 +13,34 @@ TICK = "✅"
 CROSS = "❌"
 
 
+class TileNotFoundError(Exception):
+    """Tile Not Found Exception."""
+
+    def __init__(self, index: int) -> None:
+        super().__init__(f"No tile found matching the {index}")
+
+
+class BoardNotFoundError(Exception):
+    """Tile Not Found Exception."""
+
+    def __init__(self, index: int) -> None:
+        super().__init__(f"No board found matching the {index}")
+
+
+class EmptyTileDotError(Exception):
+    """Tile Not Found Exception."""
+
+    def __init__(self) -> None:
+        super().__init__("Empty Tile doesnt have dots")
+
+
+class DotNotFoundError(Exception):
+    """Tile Not Found Exception."""
+
+    def __init__(self, index: int, tile_num: int) -> None:
+        super().__init__(f"Dot {index} not found in Tile {tile_num}")
+
+
 class TileStatus(Enum):
     """Tile Status class."""
 
@@ -66,6 +94,9 @@ class Tile:
     def __str__(self) -> str:
         return self.__repr__()
 
+    def __eq__(self, other: int) -> bool:
+        return self._num == other
+
     @property
     def is_empty(self) -> bool:
         """Return if the tile is empty."""
@@ -88,7 +119,10 @@ class EmptyTile(Tile):
         super().__init__(num, TileStatus.EMPTY)
 
     def __repr__(self) -> str:
-        return "EmptyTile(Empty:True)"
+        return f"EmptyTile(Number:{self._num}, Empty:True)"
+
+    def __getitem__(self, index: int) -> None:
+        raise EmptyTileDotError
 
 
 class ActiveTile(Tile):
@@ -99,13 +133,16 @@ class ActiveTile(Tile):
         self._dots: list[Dot] = [Dot(i) for i in dots_num]
 
     def __repr__(self) -> str:
-        return f"Tile(Dots:{self._dots})"
+        return f"ActiveTile((Number:{self._num}, Dots:{self._dots}, Empty:False)"
 
     def __iter__(self) -> iter:
         return iter(self._dots)
 
     def __getitem__(self, index: int) -> Dot:
-        return self._dots[index]
+        if 0 <= index < len(self._dots):
+            return self._dots[index]
+
+        raise DotNotFoundError(index, self._num)
 
     def __len__(self) -> int:
         return len(self._dots)
@@ -122,7 +159,14 @@ class ActiveTile(Tile):
 class Board:
     """Board class."""
 
-    def __init__(self, board_size: tuple[int, int], dots_to_spawn: int = 4, empty_spaces: int = 1) -> None:
+    def __init__(
+        self,
+        msg_id: int,
+        board_size: tuple[int, int],
+        dots_to_spawn: int = 4,
+        empty_spaces: int = 1,
+    ) -> None:
+        self._msg_id: int = msg_id
         self._board_size: tuple[int, int] = board_size
         self._total_spaces: int = board_size[0] * board_size[1]
         self._dots_to_spawn: int = dots_to_spawn
@@ -133,6 +177,21 @@ class Board:
         self._empty_tiles: list[EmptyTile] = [EmptyTile(self._total_spaces - i) for i in range(empty_spaces)]
 
         self._lock: asyncio.Lock = asyncio.Lock()
+
+    def __iter__(self) -> iter:
+        return iter(self.all_tiles)
+
+    def __getitem__(self, index: int) -> ActiveTile | EmptyTile:
+        for t in self.all_tiles:
+            if t.num == index:
+                return t
+
+        raise TileNotFoundError(index)
+
+    @property
+    def msg_id(self) -> int:
+        """Return the message id."""
+        return self._msg_id
 
     @property
     def lock(self) -> asyncio.Lock:
@@ -183,6 +242,7 @@ class GameFlow:
     """Game Flow class."""
 
     def __init__(self) -> None:
+        self._boards: list[Board] = []
         self._players: list[Player] = []
 
     @property
@@ -194,6 +254,32 @@ class GameFlow:
     def player_two(self) -> Player:
         """Return Player 2."""
         return self._players[1]
+
+    @property
+    def boards(self) -> list[Board]:
+        """Return the boards."""
+        return self._boards
+
+    def create_board(
+        self,
+        msg_id: int,
+        board_size: tuple[int, int],
+        dots_to_spawn: int = 4,
+        empty_spaces: int = 1,
+    ) -> None:
+        """Create a board."""
+        board = Board(msg_id, board_size, dots_to_spawn, empty_spaces)
+        board.make_board()
+        self._boards.append(board)
+
+    def get_dot_by_cords(self, msg_id: int, tile_num: int, dot_num: int) -> Dot:
+        """Find a dot."""
+        for board in self._boards:
+            if board.msg_id == msg_id:
+                tile = board[tile_num]
+                return tile[dot_num]
+
+        raise BoardNotFoundError(msg_id)
 
 
 games: list[GameFlow] = []
