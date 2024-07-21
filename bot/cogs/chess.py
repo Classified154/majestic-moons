@@ -41,6 +41,12 @@ class DotNotFoundError(Exception):
         super().__init__(f"Dot {index} not found in Tile {tile_num}")
 
 
+def select_unique_numbers(numbers: list[int], count: int) -> list[int]:
+    """Select unique numbers."""
+    unique_numbers = list(set(numbers))  # Get unique numbers
+    return random.sample(unique_numbers, count)
+
+
 class TileStatus(Enum):
     """Tile Status class."""
 
@@ -226,7 +232,6 @@ class Board:
         return disnake.File(fp=buffer, filename="board.png")
 
     def _make_tiles(self) -> None:
-        """Make the tiles."""
         total_num = (self._total_spaces - self._empty_spaces) * (self._dots_to_spawn // 2)
         paired_num = list(range(total_num)) * 2
         random.shuffle(paired_num)
@@ -234,7 +239,7 @@ class Board:
             if i < self._empty_spaces:
                 self._tiles.append(self._empty_tiles[i])
             else:
-                dot_numbers = random.sample(paired_num, self._dots_to_spawn)
+                dot_numbers = select_unique_numbers(paired_num, self._dots_to_spawn)
                 self._tiles.append(ActiveTile(i, dot_numbers))
 
                 for num in dot_numbers:
