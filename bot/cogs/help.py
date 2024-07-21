@@ -58,8 +58,7 @@ class Help(commands.Cog):
 
             embed = disnake.Embed(
                 title="Error",
-                description=f"Author : {inter.author.mention} \n\n Command : `/{inter.data.name}` "
-                f"\n\n```Python\n{traceback_text[:3500]}```",
+                description=f"Author : {inter.author.mention} \n\n Command : `/{inter.data.name}` \n\n```Python\n{traceback_text[:3500]}```",  # noqa: E501
                 color=disnake.Color(C_Nothing),
             )
             await er_channel.send(embed=embed)

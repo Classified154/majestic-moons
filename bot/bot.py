@@ -109,5 +109,4 @@ for file in os.listdir(bot.cog_path):
     elif file.endswith(".py"):
         bot.load_extension(f"cogs.{file[:-3]}")
 
-
 bot.run(TOKEN)
