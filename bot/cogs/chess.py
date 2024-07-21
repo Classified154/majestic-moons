@@ -94,9 +94,6 @@ class Tile:
     def __str__(self) -> str:
         return self.__repr__()
 
-    def __eq__(self, other: int) -> bool:
-        return self._num == other
-
     @property
     def is_empty(self) -> bool:
         """Return if the tile is empty."""
@@ -124,6 +121,9 @@ class EmptyTile(Tile):
     def __getitem__(self, index: int) -> None:
         raise EmptyTileDotError
 
+    def __eq__(self, other: object) -> bool:
+        return NotImplemented
+
 
 class ActiveTile(Tile):
     """Tile class."""
@@ -134,6 +134,12 @@ class ActiveTile(Tile):
 
     def __repr__(self) -> str:
         return f"ActiveTile((Number:{self._num}, Dots:{self._dots}, Empty:False)"
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, ActiveTile):
+            return any(self_dot.num == other_dot.num for self_dot in self._dots for other_dot in other)
+
+        return NotImplemented
 
     def __iter__(self) -> iter:
         return iter(self._dots)
@@ -202,6 +208,10 @@ class Board:
     def all_tiles(self) -> list[ActiveTile | EmptyTile]:
         """Return all tiles."""
         return self._tiles + self._empty_tiles
+
+    def _move_tiles(self) -> None:
+        """Move the Empty tiles."""
+        # We should move the empty itself to another position exchanging it with a filled tile
 
     def _generate_board_img(self) -> disnake.File:
         """Generate the board image."""
@@ -278,6 +288,14 @@ class GameFlow:
             if board.msg_id == msg_id:
                 tile = board[tile_num]
                 return tile[dot_num]
+
+        raise BoardNotFoundError(msg_id)
+
+    def get_tile_by_cords(self, msg_id: int, tile_num: int) -> ActiveTile | EmptyTile:
+        """Find a tile."""
+        for board in self._boards:
+            if board.msg_id == msg_id:
+                return board[tile_num]
 
         raise BoardNotFoundError(msg_id)
 
