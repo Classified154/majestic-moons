@@ -2,10 +2,12 @@ import asyncio
 import random
 from dataclasses import dataclass
 from enum import Enum
+from io import BytesIO
 
 import disnake
 from disnake import MessageInteraction
 from disnake.ext import commands
+from PIL import Image
 
 TICK = "✅"
 CROSS = "❌"
@@ -69,6 +71,15 @@ class Tile:
         """Return if the tile is empty."""
         return self._empty == TileStatus.EMPTY
 
+    @property
+    def num(self) -> int:
+        """Return the number."""
+        return self._num
+
+    @num.setter
+    def num(self, value: int) -> None:
+        self._num = value
+
 
 class EmptyTile(Tile):
     """Empty Tile class."""
@@ -124,9 +135,26 @@ class Board:
         self._lock: asyncio.Lock = asyncio.Lock()
 
     @property
+    def lock(self) -> asyncio.Lock:
+        """Return the lock."""
+        return self._lock
+
+    @property
     def all_tiles(self) -> list[ActiveTile | EmptyTile]:
         """Return all tiles."""
         return self._tiles + self._empty_tiles
+
+    def _generate_board_img(self) -> disnake.File:
+        """Generate the board image."""
+        base: Image = Image.new("RGB", (self._board_size[0] * 100, self._board_size[1] * 100), (255, 255, 255))
+
+        # Create stuff here
+
+        buffer = BytesIO()
+        base.save(buffer, "png")
+        buffer.seek(0)
+
+        return disnake.File(fp=buffer, filename="board.png")
 
     def _make_tiles(self) -> None:
         """Make the tiles."""
@@ -146,19 +174,9 @@ class Board:
     def make_board(self) -> None:
         """Make the board."""
         print(self._board_size)
-        """number_filled_tiles = self.board_size**2-self.empty_tiles
-        total_numbers = number_filled_tiles*self.tile_size
-        all_numbers = list(range(total_numbers//2))*2
-
-        while True:
-            random.shuffle(all_numbers)
-            grouped_numbers = [*batched(all_numbers, self.tile_size)]
-            if all(map(lambda a: len(a) == len(set(a)), grouped_numbers)):
-                break
-
-        for i, j in enumerate(random.sample(range(self.board_size**2), number_filled_tiles)):
-            self.tile_dict[j] = ActiveTile(tuple(grouped_numbers[i]))
-            """
+        # Need to make tiles
+        # generate board image
+        # setup cords
 
 
 class GameFlow:
@@ -199,6 +217,8 @@ class MainView(disnake.ui.View):
     async def close_ticket(self, button: disnake.Button, inter: disnake.MessageInteraction) -> None:
         """Button to play your turn."""
         # Complete play button
+        # Need either hidden message prompt with 2 dropdown or a Modal with 2 dropdowns
+        # denoting the Tile cords and Dot cords
 
 
 class ChessCog(commands.Cog):
