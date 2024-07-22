@@ -260,6 +260,14 @@ class GameFlow:
         self._boards: list[Board] = []
         self._players: list[Player] = []
 
+    def __getitem__(self, msg_id: int) -> Board or None:
+        """Retrieve a board by its message ID."""
+        for board in self._boards:
+            if board.msg_id == msg_id:
+                return board
+
+        raise BoardNotFoundError(msg_id)
+
     @property
     def player_one(self) -> Player:
         """Return Player 1."""
@@ -305,7 +313,40 @@ class GameFlow:
         raise BoardNotFoundError(msg_id)
 
 
-games: list[GameFlow] = []
+game_flow: list[GameFlow] = []
+
+
+class TurnModal(disnake.ui.Modal):
+    """A modal that prompts the user to enter the tile and dot coordinates for their turn."""
+
+    def __init__(self) -> None:
+        components = [
+            disnake.ui.TextInput(
+                label="Tile Coordinates",
+                custom_id="tile_coords",
+                style=disnake.TextInputStyle.short,
+                placeholder="Enter the tile coordinates (e.g., 1,2)",
+                min_length=3,
+                max_length=5,
+            ),
+            disnake.ui.TextInput(
+                label="Dot Coordinates",
+                custom_id="dot_coords",
+                style=disnake.TextInputStyle.short,
+                placeholder="Enter the dot number (e.g., 1)",
+                min_length=1,
+                max_length=2,
+            ),
+        ]
+        super().__init__(title="Your Turn", custom_id="turn_modal", components=components)
+
+    async def callback(self, inter: disnake.ModalInteraction) -> None:
+        """Callback for the modal."""  # noqa: D401
+        tile_coords = inter.text_values["tile_coords"]
+        dot_coords = inter.text_values["dot_coords"]
+        # Process inputs here
+        await inter.response.send_message(f"Tile coordinates: {tile_coords}, Dot coordinates: {dot_coords}",
+                                          ephemeral=True)
 
 
 class MainView(disnake.ui.View):
@@ -323,11 +364,16 @@ class MainView(disnake.ui.View):
         await inter.response.send_message("Pleas wait for your turn!")
 
     @disnake.ui.button(label="Play Turn", emoji=CROSS, style=disnake.ButtonStyle.grey, custom_id="ticket_close")
-    async def close_ticket(self, button: disnake.Button, inter: disnake.MessageInteraction) -> None:
+    async def close_ticket(self, _: disnake.Button, inter: disnake.MessageInteraction) -> None:
         """Button to play your turn."""
-        # Complete play button
-        # Need either hidden message prompt with 2 dropdown or a Modal with 2 dropdowns
-        # denoting the Tile cords and Dot cords
+        for game in game_flow:
+            board = game[await inter.original_message().id]
+
+            if board and any(player.user_id == inter.user.id for player in board.players):
+                modal = TurnModal()
+                return await inter.response.send_modal(modal)
+
+        return await inter.response.send_message("It's not your turn or you're not in a game.", ephemeral=True)
 
 
 class ChessCog(commands.Cog):
