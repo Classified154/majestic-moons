@@ -137,6 +137,7 @@ class ActiveTile(Tile):
     def __init__(self, num: int, dots_num: list[int]) -> None:
         super().__init__(num, TileStatus.FILLED)
         self._dots: list[Dot] = [Dot(i) for i in dots_num]
+        self._is_moved = False
 
     def __repr__(self) -> str:
         return f"ActiveTile((Number:{self._num}, Dots:{self._dots}, Empty:False)"
@@ -158,6 +159,15 @@ class ActiveTile(Tile):
 
     def __len__(self) -> int:
         return len(self._dots)
+
+    @property
+    def is_moved(self) -> bool:
+        """Return indexes of all adjacent tiles."""
+        return self._is_moved
+
+    @is_moved.setter
+    def is_moved(self, value: bool) -> None:
+        self._is_moved = value
 
     def set_dot_found(self, position: int) -> None:
         """Mark a dot as found."""
@@ -186,7 +196,8 @@ class Board:
 
         self._tiles: list[ActiveTile | EmptyTile] = []
 
-        self._empty_tiles: list[EmptyTile] = [EmptyTile(self._total_spaces - i) for i in range(empty_spaces)]
+        self._empty_tiles: list[EmptyTile] = [
+            EmptyTile(self._total_spaces - i-1) for i in range(empty_spaces)]
 
         self._lock: asyncio.Lock = asyncio.Lock()
 
@@ -213,15 +224,63 @@ class Board:
     @property
     def all_tiles(self) -> list[ActiveTile | EmptyTile]:
         """Return all tiles."""
-        return self._tiles + self._empty_tiles
+        return self._tiles
 
-    def _move_tiles(self) -> None:
+    def find_movable_tiles(self, tile: Tile) -> list[ActiveTile]:
+        """Returns indexes of all adjacent tiles."""
+        adjacent_tiles = []
+
+        if tile.num % self._board_size[0] != 0:
+            adj_tile = self.__getitem__(tile.num-1)
+            if not adj_tile.is_empty:
+                if not adj_tile.is_moved:
+                    adjacent_tiles.append(adj_tile)
+
+        if tile.num % self._board_size[0] != self._board_size[0]-1:
+            adj_tile = self.__getitem__(tile.num+1)
+            if not adj_tile.is_empty:
+                if not adj_tile.is_moved:
+                    adjacent_tiles.append(adj_tile)
+
+        if tile.num >= self._board_size[0]:
+            adj_tile = self.__getitem__(
+                tile.num-self._board_size[0])
+            if not adj_tile.is_empty:
+                if not adj_tile.is_moved:
+                    adjacent_tiles.append(adj_tile)
+
+        if tile.num < self._board_size[0]*(self._board_size[1]-1):
+            adj_tile = self.__getitem__(
+                tile.num+self._board_size[0])
+            if not adj_tile.is_empty:
+                if not adj_tile.is_moved:
+                    adjacent_tiles.append(adj_tile)
+
+        return adjacent_tiles
+
+    def move_tiles(self) -> None:
         """Move the Empty tiles."""
         # We should move the empty itself to another position exchanging it with a filled tile
+        moved_tiles = []
+        for tile in self._empty_tiles:
+            chosen_tile = random.choice(self.find_movable_tiles(tile))
+            temp_tile = chosen_tile.num
+            chosen_tile.num = tile.num
+            tile.num = temp_tile
+            chosen_tile.is_moved = True
+            moved_tiles.append(chosen_tile.num)
+            print()
+
+        for tile in self.all_tiles:
+            if not tile.is_empty:
+                tile.is_moved = False
+        for tile_num in moved_tiles:
+            self[tile_num].is_moved = True
 
     def _generate_board_img(self) -> disnake.File:
         """Generate the board image."""
-        base: Image = Image.new("RGB", (self._board_size[0] * 100, self._board_size[1] * 100), (255, 255, 255))
+        base: Image = Image.new(
+            "RGB", (self._board_size[0] * 100, self._board_size[1] * 100), (255, 255, 255))
 
         # Create stuff here
 
@@ -232,22 +291,26 @@ class Board:
         return disnake.File(fp=buffer, filename="board.png")
 
     def _make_tiles(self) -> None:
-        total_num = (self._total_spaces - self._empty_spaces) * (self._dots_to_spawn // 2)
+        total_num = (self._total_spaces - self._empty_spaces) * \
+            (self._dots_to_spawn // 2)
         paired_num = list(range(total_num)) * 2
         random.shuffle(paired_num)
         for i in range(self._total_spaces):
             if i < self._empty_spaces:
                 self._tiles.append(self._empty_tiles[i])
             else:
-                dot_numbers = select_unique_numbers(paired_num, self._dots_to_spawn)
-                self._tiles.append(ActiveTile(i, dot_numbers))
+                dot_numbers = select_unique_numbers(
+                    paired_num, self._dots_to_spawn)
+                self._tiles.append(ActiveTile(
+                    i-self._empty_spaces, dot_numbers))
 
                 for num in dot_numbers:
                     paired_num.remove(num)
 
     def make_board(self) -> None:
         """Make the board."""
-        print(self._board_size)
+        self._make_tiles()
+
         # Need to make tiles
         # generate board image
         # setup cords
@@ -352,7 +415,8 @@ class ChessCog(commands.Cog):
             self.persistence_views = True
 
         await self.bot.change_presence(
-            activity=disnake.Activity(type=disnake.ActivityType.playing, name="with chess pieces"),
+            activity=disnake.Activity(
+                type=disnake.ActivityType.playing, name="with chess pieces"),
         )
 
     @commands.slash_command()
