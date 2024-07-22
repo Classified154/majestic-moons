@@ -246,7 +246,7 @@ class Board:
     @property
     def all_tiles(self) -> list[ActiveTile | EmptyTile]:
         """Return all tiles."""
-        return self._tiles + self._empty_tiles
+        return self._tiles
 
     @property
     def all_players_id(self) -> list[int]:
@@ -306,7 +306,7 @@ class Board:
         # We should move the empty itself to another position exchanging it with a filled tile
         moved_tiles = []
         for tile in self._empty_tiles:
-            chosen_tile = random.choice(self.find_movable_tiles(tile))
+            chosen_tile = random.choice(self.find_movable_tiles(tile))  # noqa: S311
             temp_tile = chosen_tile.num
             chosen_tile.num = tile.num
             tile.num = temp_tile
@@ -399,7 +399,8 @@ class GameFlow:
         empty_spaces: int = 1,
     ) -> None:
         """Create a board."""
-        board = Board(msg_id, board_size, [Player(user=user), Player(user=opponent)], dots_to_spawn, empty_spaces)
+        board = Board(msg_id, board_size, [Player(user=user), Player(
+            user=opponent)], dots_to_spawn, empty_spaces)
         board.make_board()
         self._boards.append(board)
 
