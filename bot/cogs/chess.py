@@ -30,7 +30,7 @@ class EmptyTileDotError(Exception):
     """Tile Not Found Exception."""
 
     def __init__(self) -> None:
-        super().__init__("Empty Tile doesnt have dots")
+        super().__init__("Empty Tile doesn't have dots")
 
 
 class DotNotFoundError(Exception):
@@ -269,35 +269,32 @@ class Board:
     def _move_tiles(self) -> None:
         return self._tiles
 
-    def find_movable_tiles(self, tile: Tile) -> list[ActiveTile]:
-        """Returns indexes of all adjacent tiles."""
+    def find_movable(
+            self, tile: Tile) -> list[ActiveTile]:
+        """Return the index of all adjacent tiles."""
         adjacent_tiles = []
 
         if tile.num % self._board_size[0] != 0:
             adj_tile = self.__getitem__(tile.num-1)
-            if not adj_tile.is_empty:
-                if not adj_tile.is_moved:
-                    adjacent_tiles.append(adj_tile)
+            if not adj_tile.is_empty and not adj_tile.is_moved:
+                adjacent_tiles.append(adj_tile)
 
         if tile.num % self._board_size[0] != self._board_size[0]-1:
             adj_tile = self.__getitem__(tile.num+1)
-            if not adj_tile.is_empty:
-                if not adj_tile.is_moved:
-                    adjacent_tiles.append(adj_tile)
+            if not adj_tile.is_empty and not adj_tile.is_moved:
+                adjacent_tiles.append(adj_tile)
 
         if tile.num >= self._board_size[0]:
             adj_tile = self.__getitem__(
                 tile.num-self._board_size[0])
-            if not adj_tile.is_empty:
-                if not adj_tile.is_moved:
-                    adjacent_tiles.append(adj_tile)
+            if not adj_tile.is_empty and not adj_tile.is_moved:
+                adjacent_tiles.append(adj_tile)
 
         if tile.num < self._board_size[0]*(self._board_size[1]-1):
             adj_tile = self.__getitem__(
                 tile.num+self._board_size[0])
-            if not adj_tile.is_empty:
-                if not adj_tile.is_moved:
-                    adjacent_tiles.append(adj_tile)
+            if not adj_tile.is_empty and not adj_tile.is_moved:
+                adjacent_tiles.append(adj_tile)
 
         return adjacent_tiles
 
@@ -306,7 +303,7 @@ class Board:
         # We should move the empty itself to another position exchanging it with a filled tile
         moved_tiles = []
         for tile in self._empty_tiles:
-            chosen_tile = random.choice(self.find_movable_tiles(tile))  # noqa: S311
+            chosen_tile = random.choice(self.find_movable(tile))  # noqa: S311
             temp_tile = chosen_tile.num
             chosen_tile.num = tile.num
             tile.num = temp_tile
