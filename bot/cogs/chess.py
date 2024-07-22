@@ -5,7 +5,6 @@ from enum import Enum
 from io import BytesIO
 
 import disnake
-from disnake import MessageInteraction
 from disnake.ext import commands
 from PIL import Image
 
@@ -57,6 +56,26 @@ class TileStatus(Enum):
 @dataclass
 class Player:
     """Player class."""
+
+    user: disnake.Member
+    turn: bool = False
+    score: int = 0
+
+    @property
+    def user_id(self) -> int:
+        """Return the user ID."""
+        return self.user.id
+
+    @property
+    def username(self) -> str:
+        """Return the username."""
+        return self.user.name
+
+    def __repr__(self) -> str:
+        return f"Player(User ID:{self.user_id}, Username:{self.username}, Score:{self.score})"
+
+    def __str__(self) -> str:
+        return self.__repr__()
 
 
 class Dot:
@@ -185,6 +204,7 @@ class Board:
         self,
         msg_id: int,
         board_size: tuple[int, int],
+        players: list[Player],
         dots_to_spawn: int = 4,
         empty_spaces: int = 1,
     ) -> None:
@@ -193,6 +213,8 @@ class Board:
         self._total_spaces: int = board_size[0] * board_size[1]
         self._dots_to_spawn: int = dots_to_spawn
         self._empty_spaces: int = empty_spaces
+        self._user: Player = players[0]
+        self._opponent: Player = players[1]
 
         self._tiles: list[ActiveTile | EmptyTile] = []
 
@@ -224,6 +246,27 @@ class Board:
     @property
     def all_tiles(self) -> list[ActiveTile | EmptyTile]:
         """Return all tiles."""
+        return self._tiles + self._empty_tiles
+
+    @property
+    def all_players_id(self) -> list[int]:
+        """Return all player IDs."""
+        return [self._user.user_id, self._opponent.user_id]
+
+    @property
+    def current_player(self) -> Player:
+        """Return the current player."""
+        return self._user if self._user.turn else self._opponent
+
+    def _change_turn(self) -> None:
+        if self._user.turn:
+            self._user.turn = False
+            self._opponent.turn = True
+        else:
+            self._user.turn = True
+            self._opponent.turn = False
+
+    def _move_tiles(self) -> None:
         return self._tiles
 
     def find_movable_tiles(self, tile: Tile) -> list[ActiveTile]:
@@ -309,11 +352,11 @@ class Board:
 
     def make_board(self) -> None:
         """Make the board."""
-        self._make_tiles()
+        print(self._board_size)
 
-        # Need to make tiles
-        # generate board image
-        # setup cords
+    # Need to make tiles
+    # generate board image
+    # setup cords
 
 
 class GameFlow:
@@ -322,6 +365,14 @@ class GameFlow:
     def __init__(self) -> None:
         self._boards: list[Board] = []
         self._players: list[Player] = []
+
+    def __getitem__(self, msg_id: int) -> Board:
+        """Retrieve a board by its message ID."""
+        for board in self._boards:
+            if board.msg_id == msg_id:
+                return board
+
+        raise BoardNotFoundError(msg_id)
 
     @property
     def player_one(self) -> Player:
@@ -342,11 +393,13 @@ class GameFlow:
         self,
         msg_id: int,
         board_size: tuple[int, int],
+        user: disnake.Member,
+        opponent: disnake.Member,
         dots_to_spawn: int = 4,
         empty_spaces: int = 1,
     ) -> None:
         """Create a board."""
-        board = Board(msg_id, board_size, dots_to_spawn, empty_spaces)
+        board = Board(msg_id, board_size, [Player(user=user), Player(user=opponent)], dots_to_spawn, empty_spaces)
         board.make_board()
         self._boards.append(board)
 
@@ -368,7 +421,42 @@ class GameFlow:
         raise BoardNotFoundError(msg_id)
 
 
-games: list[GameFlow] = []
+game_flow: GameFlow = GameFlow()
+
+
+class TurnModal(disnake.ui.Modal):
+    """A modal that prompts the user to enter the tile and dot coordinates for their turn."""
+
+    def __init__(self) -> None:
+        components = [
+            disnake.ui.TextInput(
+                label="Tile Coordinates",
+                custom_id="tile_cords",
+                style=disnake.TextInputStyle.short,
+                placeholder="Enter the tile coordinates (e.g., 1,2)",
+                min_length=3,
+                max_length=5,
+            ),
+            disnake.ui.TextInput(
+                label="Dot Coordinates",
+                custom_id="dot_cords",
+                style=disnake.TextInputStyle.short,
+                placeholder="Enter the dot number (e.g., 1)",
+                min_length=1,
+                max_length=2,
+            ),
+        ]
+        super().__init__(title="Your Turn", custom_id="turn_modal", components=components)
+
+    async def callback(self, inter: disnake.ModalInteraction) -> None:
+        """Modal Callback."""
+        tile_cords = inter.text_values["tile_cords"]
+        dot_cords = inter.text_values["dot_cords"]
+        # Process inputs here
+        await inter.response.send_message(
+            f"Tile coordinates: {tile_cords}, Dot coordinates: {dot_cords}",
+            ephemeral=True,
+        )
 
 
 class MainView(disnake.ui.View):
@@ -377,20 +465,21 @@ class MainView(disnake.ui.View):
     def __init__(self) -> None:
         super().__init__(timeout=None)
 
-    async def interaction_check(self, inter: MessageInteraction) -> bool:
-        """Check if the interaction is valid."""
-        return inter.author.guild_permissions.manage_messages
-
-    async def on_error(self, _: Exception, __: disnake.ui.Item, inter: MessageInteraction) -> None:
-        """Error handler."""
-        await inter.response.send_message("Pleas wait for your turn!")
-
-    @disnake.ui.button(label="Play Turn", emoji=CROSS, style=disnake.ButtonStyle.grey, custom_id="ticket_close")
-    async def close_ticket(self, button: disnake.Button, inter: disnake.MessageInteraction) -> None:
+    @disnake.ui.button(label="Play Turn", style=disnake.ButtonStyle.green, custom_id="play_your_turn")
+    async def play_turn(self, _: disnake.Button, inter: disnake.MessageInteraction) -> None:
         """Button to play your turn."""
-        # Complete play button
-        # Need either hidden message prompt with 2 dropdown or a Modal with 2 dropdowns
-        # denoting the Tile cords and Dot cords
+        board = game_flow[inter.message.id]
+        if inter.author.id not in board.all_players_id:
+            await inter.response.send_message("You are not in the game!", ephemeral=True)
+            return
+
+        player = board.current_player
+        if player.user_id != inter.author.id:
+            await inter.response.send_message("Please wait for your turn!", ephemeral=True)
+            return
+
+        modal = TurnModal()
+        await inter.response.send_modal(modal)
 
 
 class ChessCog(commands.Cog):

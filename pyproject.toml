@@ -41,4 +41,7 @@ ignore = [
     # Annotations.
     "ANN101",
     "ANN102",
+    "PLR0913",
+    "COM812",
+    "ISC001",
 ]
