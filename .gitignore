@@ -29,3 +29,11 @@ build/
 .vscode/
 # MacOS
 .DS_Store
+
+#virtual env
+.ruff_cache
+/include
+/bin
+/lib
+/lib64
+pyvenv.cfg

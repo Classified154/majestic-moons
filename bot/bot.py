@@ -104,7 +104,7 @@ async def load(ctx: commands.Context, extension: str) -> None:
 
 
 for file in os.listdir(bot.cog_path):
-    if file.startswith("!"):
+    if file.startswith(("!", "__")):
         pass
     elif file.endswith(".py"):
         bot.load_extension(f"cogs.{file[:-3]}")

@@ -3,10 +3,11 @@ import random
 from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
+from pathlib import Path
 
 import disnake
 from disnake.ext import commands
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 TICK = "✅"
 CROSS = "❌"
@@ -64,6 +65,13 @@ class TileStatus(Enum):
 
     EMPTY = 0
     FILLED = 1
+
+
+class NumberStatus(Enum):
+    """Number Status class."""
+
+    VISIBLE = 0
+    HIDDEN = 1
 
 
 @dataclass
@@ -215,12 +223,12 @@ class Board:
     """Board class."""
 
     def __init__(
-            self,
-            msg_id: int,
-            board_size: tuple[int, int],
-            players: list[Player],
-            dots_to_spawn: int = 4,
-            empty_spaces: int = 1,
+        self,
+        msg_id: int,
+        board_size: tuple[int, int],
+        players: list[Player],
+        dots_to_spawn: int = 4,
+        empty_spaces: int = 1,
     ) -> None:
         self._msg_id: int = msg_id
         self._board_size: tuple[int, int] = board_size
@@ -235,6 +243,37 @@ class Board:
         self._empty_tiles: list[EmptyTile] = [EmptyTile(self._total_spaces - i - 1) for i in range(empty_spaces)]
 
         self._lock: asyncio.Lock = asyncio.Lock()
+
+        self.padding: dict[str, int] = {
+            "top": 20,
+            "bottom": 30,
+            "left": 40,
+            "right": 20,
+        }
+        self.ROCK_SIZE: int = (40, 40)
+        self.font = ImageFont.truetype("../assets/arial.ttf", 20)
+
+        # Load raft images
+        self.raft_images = []
+        for i in range(4):
+            raft_path = f"../assets/raft/tile{i:03d}.png"
+            if Path.exists(Path(raft_path)):
+                raft_img = Image.open(raft_path).convert("RGBA")
+                self.raft_images.append(raft_img)
+        self.raft_width, self.raft_height = self.raft_images[0].size
+
+        # Load rock images
+        self.rock_images = []
+        for i in range(1, 11):
+            rock_path = f"../assets/rocks/tile{i:03d}.png"
+            if Path.exists(Path(rock_path)):
+                rock_img = Image.open(rock_path).convert("RGBA")
+                rock_img = rock_img.resize(self.ROCK_SIZE, Image.LANCZOS)
+                self.rock_images.append(rock_img)
+
+        self.raft_offset = 10
+        self.board_width: int = (self._board_size[0] * self.raft_width) + ((self._board_size[0] - 1) * 10)
+        self.board_height: int = (self._board_size[1] * self.raft_height) + ((self._board_size[1] - 1) * 10)
 
     def __iter__(self) -> iter:
         return iter(self.all_tiles)
@@ -327,17 +366,103 @@ class Board:
         for tile_num in moved_tiles:
             self[tile_num].is_moved = True
 
-    def _generate_board_img(self) -> disnake.File:
-        """Generate the board image."""
-        base: Image = Image.new("RGB", (self._board_size[0] * 100, self._board_size[1] * 100), (255, 255, 255))
+    def _get_dot_positions(self, num_dots: int, width: int, height: int) -> list[tuple[int, int]]:
+        """Get the dot positions based on the number of dots to spawn."""
+        if num_dots == 3:  # noqa: PLR2004
+            positions = [
+                (self.padding["left"], self.padding["top"]),
+                (width - self.padding["right"] - self.ROCK_SIZE[0], self.padding["top"]),
+                (width // 2 - self.ROCK_SIZE[0] // 2, height - self.padding["bottom"] - self.ROCK_SIZE[1]),
+            ]
+        elif num_dots == 4:  # noqa: PLR2004
+            positions = [
+                (self.padding["left"], self.padding["top"]),
+                (width - self.padding["right"] - self.ROCK_SIZE[0], self.padding["top"]),
+                (self.padding["left"], height - self.padding["bottom"] - self.ROCK_SIZE[1]),
+                (
+                    width - self.padding["right"] - self.ROCK_SIZE[0],
+                    height - self.padding["bottom"] - self.ROCK_SIZE[1],
+                ),
+            ]
+        elif num_dots == 5:  # noqa: PLR2004
+            positions = [
+                (self.padding["left"], self.padding["top"]),
+                (width - self.padding["right"] - self.ROCK_SIZE[0], self.padding["top"]),
+                (self.padding["left"], height - self.padding["bottom"] - self.ROCK_SIZE[1]),
+                (
+                    width - self.padding["right"] - self.ROCK_SIZE[0],
+                    height - self.padding["bottom"] - self.ROCK_SIZE[1],
+                ),
+                (width // 2 - self.ROCK_SIZE[0] // 2, height // 2 - self.ROCK_SIZE[1] // 2),
+            ]
+        else:
+            error_message = f"Expected 3, 4, or 5 dots, got {num_dots}"
+            raise ValueError(error_message)
 
-        # Create stuff here
+        return positions
 
-        buffer = BytesIO()
-        base.save(buffer, "png")
-        buffer.seek(0)
+    def _create_rock_with_number(self, number: str, numbers_visible: NumberStatus) -> Image.Image:
+        """Create a rock image with or without the number visible on it."""
+        if numbers_visible == NumberStatus.VISIBLE:
+            rock = random.choice(self.rock_images).copy()  # noqa: S311
+            draw = ImageDraw.Draw(rock)
+            bbox = draw.textbbox((0, 0), number, font=self.font)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1] + 10
+            position = ((self.ROCK_SIZE[0] - text_width) // 2, (self.ROCK_SIZE[1] - text_height) // 2)
+            draw.text(position, number, fill=(255, 255, 255), font=self.font)
+        else:
+            rock = random.choice(self.rock_images).copy()  # noqa: S311
+        return rock
 
-        return disnake.File(fp=buffer, filename="board.png")
+    def _create_board_frame(self, raft_image: Image.Image, numbers_visible: NumberStatus) -> Image.Image:
+        """Create a frame of the board for the GIF."""
+        base = Image.new("RGB", (self.board_width, self.board_height), (135, 206, 235))
+        draw = ImageDraw.Draw(base)
+
+        for index, tile in enumerate(self.all_tiles):
+            row = index // self._board_size[0]
+            col = index % self._board_size[0]
+            x = col * (self.raft_width + self.raft_offset)
+            y = row * (self.raft_height + self.raft_offset)
+
+            if isinstance(tile, EmptyTile):
+                draw.rectangle([x, y, x + self.raft_width, y + self.raft_height], fill=(135, 206, 235))
+            elif isinstance(tile, ActiveTile):
+                base.paste(raft_image, (x, y), raft_image)
+                numbers = [str(dot.num) for dot in tile]
+                positions = self._get_dot_positions(self._dots_to_spawn, self.raft_width, self.raft_height)
+
+                for num, pos, dot in zip(numbers, positions, tile, strict=False):
+                    if not dot.found:
+                        rock_with_number = self._create_rock_with_number(num, numbers_visible)
+                        rock_x = x + pos[0]
+                        rock_y = y + pos[1]
+                        base.paste(rock_with_number, (rock_x, rock_y), rock_with_number)
+                    else:
+                        transparent_square = Image.new("RGBA", self.ROCK_SIZE, (0, 0, 0, 0))
+                        square_x = x + pos[0]
+                        square_y = y + pos[1]
+                        base.paste(transparent_square, (square_x, square_y), transparent_square)
+
+        return base
+
+    def _generate_board_img(self, numbers_visible: NumberStatus) -> disnake.File:
+        """Generate the board image as an animated GIF."""
+        print("Generating board image")
+        try:
+            print(f"Board size: {self._board_size}")
+            print(f"Number of tiles: {len(self._tiles)}")
+            print(f"Number of active tiles: {sum(1 for tile in self._tiles if isinstance(tile, ActiveTile))}")
+            frames = [self._create_board_frame(raft_image, numbers_visible) for raft_image in self.raft_images]
+
+            buffer = BytesIO()
+            frames[0].save(buffer, format="GIF", save_all=True, append_images=frames[1:], duration=400, loop=0)
+            buffer.seek(0)
+
+            return disnake.File(fp=buffer, filename="board.gif")
+        except Exception as e:  # noqa: BLE001
+            print(f"An error occurred while generating the board image: {e!s}")
 
     def _make_tiles(self) -> None:
         total_num = (self._total_spaces - self._empty_spaces) * (self._dots_to_spawn // 2)
@@ -393,13 +518,13 @@ class GameFlow:
         return self._boards
 
     def create_board(
-            self,
-            msg_id: int,
-            board_size: tuple[int, int],
-            user: disnake.Member,
-            opponent: disnake.Member or None,
-            dots_to_spawn: int = 4,
-            empty_spaces: int = 1,
+        self,
+        msg_id: int,
+        board_size: tuple[int, int],
+        user: disnake.Member,
+        opponent: disnake.Member or None,
+        dots_to_spawn: int = 4,
+        empty_spaces: int = 1,
     ) -> Board:
         """Create a board."""
         _is_opponent_bot = opponent is None
@@ -409,7 +534,7 @@ class GameFlow:
             board_size,
             [Player(user=user, bot=False), Player(user=opponent, bot=_is_opponent_bot)],
             dots_to_spawn,
-            empty_spaces
+            empty_spaces,
         )
         board.make_board()
         self._boards.append(board)
@@ -532,6 +657,7 @@ class ChessCog(commands.Cog):
             user=inter.author,
             opponent=None,
         )
+        print("Board created")
 
         await inter.edit_original_message(board)
 
