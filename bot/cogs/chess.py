@@ -70,20 +70,20 @@ class TileStatus(Enum):
 class Player:
     """Player class."""
 
-    user: disnake.Member
-    bot: bool
+    user: disnake.Member or None
+    bot: bool = False
     turn: bool = False
     score: int = 0
 
     @property
     def user_id(self) -> int:
         """Return the user ID."""
-        return self.user.id
+        return self.user.id if self.user else None
 
     @property
     def username(self) -> str:
         """Return the username."""
-        return self.user.name
+        return self.user.name if self.user else None
 
     def __repr__(self) -> str:
         return f"Player(User ID:{self.user_id}, Username:{self.username}, Score:{self.score})"
@@ -215,12 +215,12 @@ class Board:
     """Board class."""
 
     def __init__(
-        self,
-        msg_id: int,
-        board_size: tuple[int, int],
-        players: list[Player],
-        dots_to_spawn: int = 4,
-        empty_spaces: int = 1,
+            self,
+            msg_id: int,
+            board_size: tuple[int, int],
+            players: list[Player],
+            dots_to_spawn: int = 4,
+            empty_spaces: int = 1,
     ) -> None:
         self._msg_id: int = msg_id
         self._board_size: tuple[int, int] = board_size
@@ -393,19 +393,24 @@ class GameFlow:
         return self._boards
 
     def create_board(
-        self,
-        msg_id: int,
-        board_size: tuple[int, int],
-        user: disnake.Member,
-        opponent: disnake.Member or None,
-        dots_to_spawn: int = 4,
-        empty_spaces: int = 1,
+            self,
+            msg_id: int,
+            board_size: tuple[int, int],
+            user: disnake.Member,
+            opponent: disnake.Member or None,
+            dots_to_spawn: int = 4,
+            empty_spaces: int = 1,
     ) -> Board:
         """Create a board."""
         _is_opponent_bot = opponent is None
 
-        board = Board(msg_id, board_size, [Player(user=user, bot=False),
-                                           Player(user=opponent, bot=_is_opponent_bot)], dots_to_spawn, empty_spaces)
+        board = Board(
+            msg_id,
+            board_size,
+            [Player(user=user, bot=False), Player(user=opponent, bot=_is_opponent_bot)],
+            dots_to_spawn,
+            empty_spaces
+        )
         board.make_board()
         self._boards.append(board)
         return board
@@ -516,16 +521,19 @@ class ChessCog(commands.Cog):
 
     @commands.slash_command()
     @commands.default_member_permissions(administrator=True)
-    async def game(self, inter: disnake.CommandInteraction) -> None:
+    async def game(self, inter: disnake.MessageCommandInteraction) -> None:
         """Start a game against the computer."""
+        await inter.response.defer()
+        msg = await inter.original_message()
+
         board = game_flow.create_board(
-            msg_id=await inter.original_message().id,
+            msg_id=msg.id,
             board_size=(3, 3),  # TODO: Get input from user
             user=inter.author,
             opponent=None,
         )
 
-        await inter.response.send(board)
+        await inter.edit_original_message(board)
 
     @commands.slash_command(name="game-vs")
     @commands.default_member_permissions(administrator=True)
@@ -537,14 +545,17 @@ class ChessCog(commands.Cog):
         opponent: Mention a user you want to play with.
 
         """
+        await inter.response.defer()
+        msg = await inter.original_message()
+
         board = game_flow.create_board(
-            msg_id=await inter.original_message().id,
+            msg_id=msg.id,
             board_size=(3, 3),  # TODO: Get input from user
             user=inter.author,
             opponent=opponent,
         )
 
-        await inter.response.send(board)
+        await inter.edit_original_message(board)
 
 
 class ConfirmDelete(disnake.ui.View):
