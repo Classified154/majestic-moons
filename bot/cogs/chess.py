@@ -71,6 +71,7 @@ class Player:
     """Player class."""
 
     user: disnake.Member
+    bot: bool
     turn: bool = False
     score: int = 0
 
@@ -238,6 +239,9 @@ class Board:
     def __iter__(self) -> iter:
         return iter(self.all_tiles)
 
+    def __repr__(self) -> str:
+        return f"Board(Message ID:{self._msg_id}, Size:{self._board_size}, Players:{self._user}, {self._opponent})"
+
     def __getitem__(self, index: int) -> ActiveTile | EmptyTile:
         for t in self.all_tiles:
             if t.num == index:
@@ -393,14 +397,18 @@ class GameFlow:
         msg_id: int,
         board_size: tuple[int, int],
         user: disnake.Member,
-        opponent: disnake.Member,
+        opponent: disnake.Member or None,
         dots_to_spawn: int = 4,
         empty_spaces: int = 1,
-    ) -> None:
+    ) -> Board:
         """Create a board."""
-        board = Board(msg_id, board_size, [Player(user=user), Player(user=opponent)], dots_to_spawn, empty_spaces)
+        _is_opponent_bot = opponent is None
+
+        board = Board(msg_id, board_size, [Player(user=user, bot=False),
+                                           Player(user=opponent, bot=_is_opponent_bot)], dots_to_spawn, empty_spaces)
         board.make_board()
         self._boards.append(board)
+        return board
 
     def get_dot_by_cords(self, msg_id: int, tile_num: int, dot_num: int) -> Dot:
         """Find a dot."""
@@ -508,7 +516,20 @@ class ChessCog(commands.Cog):
 
     @commands.slash_command()
     @commands.default_member_permissions(administrator=True)
-    async def game(self, inter: disnake.CommandInteraction, opponent: disnake.Member) -> None:  # noqa: D417
+    async def game(self, inter: disnake.CommandInteraction) -> None:
+        """Start a game against the computer."""
+        board = game_flow.create_board(
+            msg_id=await inter.original_message().id,
+            board_size=(3, 3),  # TODO: Get input from user
+            user=inter.author,
+            opponent=None,
+        )
+
+        await inter.response.send(board)
+
+    @commands.slash_command(name="game-vs")
+    @commands.default_member_permissions(administrator=True)
+    async def game_vs(self, inter: disnake.CommandInteraction, opponent: disnake.Member) -> None:  # noqa: D417
         """Start your game.
 
         Parameters
@@ -516,8 +537,14 @@ class ChessCog(commands.Cog):
         opponent: Mention a user you want to play with.
 
         """
-        print(opponent)
-        await inter.response.send("Nothing yet!")
+        board = game_flow.create_board(
+            msg_id=await inter.original_message().id,
+            board_size=(3, 3),  # TODO: Get input from user
+            user=inter.author,
+            opponent=opponent,
+        )
+
+        await inter.response.send(board)
 
 
 class ConfirmDelete(disnake.ui.View):
