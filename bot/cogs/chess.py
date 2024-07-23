@@ -42,8 +42,21 @@ class DotNotFoundError(Exception):
 
 def select_unique_numbers(numbers: list[int], count: int) -> list[int]:
     """Select unique numbers."""
-    unique_numbers = list(set(numbers))  # Get unique numbers
-    return random.sample(unique_numbers, count)
+    selected = []
+    random.shuffle(numbers)
+
+    for num in numbers:
+        if num not in selected:
+            selected.append(num)
+            if len(selected) == count:
+                break
+
+    while len(selected) < count:
+        num = random.choice(numbers)  # noqa: S311
+        if num not in selected:
+            selected.append(num)
+
+    return selected
 
 
 class TileStatus(Enum):
@@ -218,8 +231,7 @@ class Board:
 
         self._tiles: list[ActiveTile | EmptyTile] = []
 
-        self._empty_tiles: list[EmptyTile] = [
-            EmptyTile(self._total_spaces - i-1) for i in range(empty_spaces)]
+        self._empty_tiles: list[EmptyTile] = [EmptyTile(self._total_spaces - i - 1) for i in range(empty_spaces)]
 
         self._lock: asyncio.Lock = asyncio.Lock()
 
@@ -266,39 +278,33 @@ class Board:
             self._user.turn = True
             self._opponent.turn = False
 
-    def _move_tiles(self) -> None:
-        return self._tiles
-
-    def find_movable(
-            self, tile: Tile) -> list[ActiveTile]:
+    def find_movable(self, tile: Tile) -> list[ActiveTile]:
         """Return the index of all adjacent tiles."""
         adjacent_tiles = []
 
         if tile.num % self._board_size[0] != 0:
-            adj_tile = self.__getitem__(tile.num-1)
+            adj_tile = self.__getitem__(tile.num - 1)
             if not adj_tile.is_empty and not adj_tile.is_moved:
                 adjacent_tiles.append(adj_tile)
 
-        if tile.num % self._board_size[0] != self._board_size[0]-1:
-            adj_tile = self.__getitem__(tile.num+1)
+        if tile.num % self._board_size[0] != self._board_size[0] - 1:
+            adj_tile = self.__getitem__(tile.num + 1)
             if not adj_tile.is_empty and not adj_tile.is_moved:
                 adjacent_tiles.append(adj_tile)
 
         if tile.num >= self._board_size[0]:
-            adj_tile = self.__getitem__(
-                tile.num-self._board_size[0])
+            adj_tile = self.__getitem__(tile.num - self._board_size[0])
             if not adj_tile.is_empty and not adj_tile.is_moved:
                 adjacent_tiles.append(adj_tile)
 
-        if tile.num < self._board_size[0]*(self._board_size[1]-1):
-            adj_tile = self.__getitem__(
-                tile.num+self._board_size[0])
+        if tile.num < self._board_size[0] * (self._board_size[1] - 1):
+            adj_tile = self.__getitem__(tile.num + self._board_size[0])
             if not adj_tile.is_empty and not adj_tile.is_moved:
                 adjacent_tiles.append(adj_tile)
 
         return adjacent_tiles
 
-    def move_tiles(self) -> None:
+    def _move_tiles(self) -> None:
         """Move the Empty tiles."""
         # We should move the empty itself to another position exchanging it with a filled tile
         moved_tiles = []
@@ -319,8 +325,7 @@ class Board:
 
     def _generate_board_img(self) -> disnake.File:
         """Generate the board image."""
-        base: Image = Image.new(
-            "RGB", (self._board_size[0] * 100, self._board_size[1] * 100), (255, 255, 255))
+        base: Image = Image.new("RGB", (self._board_size[0] * 100, self._board_size[1] * 100), (255, 255, 255))
 
         # Create stuff here
 
@@ -331,18 +336,16 @@ class Board:
         return disnake.File(fp=buffer, filename="board.png")
 
     def _make_tiles(self) -> None:
-        total_num = (self._total_spaces - self._empty_spaces) * \
-            (self._dots_to_spawn // 2)
+        total_num = (self._total_spaces - self._empty_spaces) * (self._dots_to_spawn // 2)
         paired_num = list(range(total_num)) * 2
         random.shuffle(paired_num)
+
         for i in range(self._total_spaces):
             if i < self._empty_spaces:
                 self._tiles.append(self._empty_tiles[i])
             else:
-                dot_numbers = select_unique_numbers(
-                    paired_num, self._dots_to_spawn)
-                self._tiles.append(ActiveTile(
-                    i-self._empty_spaces, dot_numbers))
+                dot_numbers = select_unique_numbers(paired_num, self._dots_to_spawn)
+                self._tiles.append(ActiveTile(i, dot_numbers))
 
                 for num in dot_numbers:
                     paired_num.remove(num)
@@ -350,10 +353,9 @@ class Board:
     def make_board(self) -> None:
         """Make the board."""
         print(self._board_size)
-
-    # Need to make tiles
-    # generate board image
-    # setup cords
+        # Need to make tiles
+        # generate board image
+        # setup cords
 
 
 class GameFlow:
@@ -396,8 +398,7 @@ class GameFlow:
         empty_spaces: int = 1,
     ) -> None:
         """Create a board."""
-        board = Board(msg_id, board_size, [Player(user=user), Player(
-            user=opponent)], dots_to_spawn, empty_spaces)
+        board = Board(msg_id, board_size, [Player(user=user), Player(user=opponent)], dots_to_spawn, empty_spaces)
         board.make_board()
         self._boards.append(board)
 
@@ -502,8 +503,7 @@ class ChessCog(commands.Cog):
             self.persistence_views = True
 
         await self.bot.change_presence(
-            activity=disnake.Activity(
-                type=disnake.ActivityType.playing, name="with chess pieces"),
+            activity=disnake.Activity(type=disnake.ActivityType.playing, name="with chess pieces"),
         )
 
     @commands.slash_command()
