@@ -74,6 +74,14 @@ class NumberStatus(Enum):
     HIDDEN = 1
 
 
+class GameDifficulty(Enum):
+    """Game Difficulty class."""
+
+    EASY = 3
+    MEDIUM = 4
+    HARD = 5
+
+
 @dataclass
 class Player:
     """Player class."""
@@ -225,14 +233,15 @@ class Board:
     def __init__(
         self,
         msg_id: int,
-        board_size: tuple[int, int],
+        num_stones: int,
         players: list[Player],
         dots_to_spawn: int = 4,
         empty_spaces: int = 1,
     ) -> None:
         self._msg_id: int = msg_id
-        self._board_size: tuple[int, int] = board_size
-        self._total_spaces: int = board_size[0] * board_size[1]
+        self._num_stones: int = num_stones
+        self._board_size: tuple[int, int] = (3, 3)
+        self._total_spaces: int = 9  # 3 x 3
         self._dots_to_spawn: int = dots_to_spawn
         self._empty_spaces: int = empty_spaces
         self._user: Player = players[0]
@@ -250,7 +259,7 @@ class Board:
             "left": 45,
             "right": 20,
         }
-        self.ROCK_SIZE: int = (40, 40)
+        self.ROCK_SIZE: tuple[int, int] = (40, 40)
         self.font = ImageFont.truetype("../assets/arial.ttf", 18)
 
         # Load raft images
@@ -287,6 +296,11 @@ class Board:
                 return t
 
         raise TileNotFoundError(index)
+
+    @property
+    def num_stones(self) -> int:
+        """Return the number of stones."""
+        return self._num_stones
 
     @property
     def msg_id(self) -> int:
@@ -520,7 +534,7 @@ class GameFlow:
     def create_board(
         self,
         msg_id: int,
-        board_size: tuple[int, int],
+        num_stones: int,
         user: disnake.Member,
         opponent: disnake.Member | None,
         dots_to_spawn: int = 4,
@@ -531,7 +545,7 @@ class GameFlow:
 
         board = Board(
             msg_id,
-            board_size,
+            num_stones,
             [Player(user=user, bot=False), Player(user=opponent, bot=_is_opponent_bot)],
             dots_to_spawn,
             empty_spaces,
@@ -646,14 +660,20 @@ class ChessCog(commands.Cog):
 
     @commands.slash_command()
     @commands.default_member_permissions(administrator=True)
-    async def game(self, inter: disnake.MessageCommandInteraction) -> None:
-        """Start a game against the computer."""
+    async def game(self, inter: disnake.MessageCommandInteraction, stones: GameDifficulty) -> None:  # noqa: D417
+        """Start a game against the computer.
+
+        Parameters
+        ----------
+        stones: Choose game difficulty.
+
+        """
         await inter.response.defer()
         msg = await inter.original_message()
 
         board = game_flow.create_board(
             msg_id=msg.id,
-            board_size=(3, 3),  # TODO: Get input from user
+            num_stones=stones.value,
             user=inter.author,
             opponent=None,
         )
@@ -663,12 +683,13 @@ class ChessCog(commands.Cog):
 
     @commands.slash_command(name="game-vs")
     @commands.default_member_permissions(administrator=True)
-    async def game_vs(self, inter: disnake.CommandInteraction, opponent: disnake.Member) -> None:  # noqa: D417
+    async def game_vs(self, inter: disnake.CommandInteraction, opponent: disnake.Member, stones: GameDifficulty) -> None:  # noqa: D417, E501
         """Start your game.
 
         Parameters
         ----------
         opponent: Mention a user you want to play with.
+        stones: Choose game difficulty.
 
         """
         await inter.response.defer()
@@ -676,7 +697,7 @@ class ChessCog(commands.Cog):
 
         board = game_flow.create_board(
             msg_id=msg.id,
-            board_size=(3, 3),  # TODO: Get input from user
+            num_stones=stones.value,
             user=inter.author,
             opponent=opponent,
         )
