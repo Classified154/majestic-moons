@@ -78,7 +78,7 @@ class NumberStatus(Enum):
 class Player:
     """Player class."""
 
-    user: disnake.Member or None
+    user: disnake.Member | None
     bot: bool = False
     turn: bool = False
     score: int = 0
@@ -522,7 +522,7 @@ class GameFlow:
         msg_id: int,
         board_size: tuple[int, int],
         user: disnake.Member,
-        opponent: disnake.Member or None,
+        opponent: disnake.Member | None,
         dots_to_spawn: int = 4,
         empty_spaces: int = 1,
     ) -> Board:
