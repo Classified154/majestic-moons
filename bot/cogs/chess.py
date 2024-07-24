@@ -386,7 +386,8 @@ class Board:
             positions = [
                 (self.padding["left"], self.padding["top"]),
                 (width - self.padding["right"] - self.ROCK_SIZE[0], self.padding["top"]),
-                (width // 2 - self.ROCK_SIZE[0] // 2, height - self.padding["bottom"] - self.ROCK_SIZE[1]),
+                # Adding offset for the bottom stone (+15,0)
+                (width // 2 - self.ROCK_SIZE[0] // 2 + 15, height - self.padding["bottom"] - self.ROCK_SIZE[1]),
             ]
         elif num_dots == 4:  # noqa: PLR2004
             positions = [
@@ -402,12 +403,13 @@ class Board:
             positions = [
                 (self.padding["left"], self.padding["top"]),
                 (width - self.padding["right"] - self.ROCK_SIZE[0], self.padding["top"]),
+                # Adding offset for the middle stone (+15, -2)
+                (width // 2 - self.ROCK_SIZE[0] // 2 + 12, height // 2 - self.ROCK_SIZE[1] // 2 - 5),
                 (self.padding["left"], height - self.padding["bottom"] - self.ROCK_SIZE[1]),
                 (
                     width - self.padding["right"] - self.ROCK_SIZE[0],
                     height - self.padding["bottom"] - self.ROCK_SIZE[1],
                 ),
-                (width // 2 - self.ROCK_SIZE[0] // 2, height // 2 - self.ROCK_SIZE[1] // 2),
             ]
         else:
             error_message = f"Expected 3, 4, or 5 dots, got {num_dots}"
@@ -445,7 +447,7 @@ class Board:
             elif isinstance(tile, ActiveTile):
                 base.paste(raft_image, (x, y), raft_image)
                 numbers = [str(dot.num) for dot in tile]
-                positions = self._get_dot_positions(self._dots_to_spawn, self.raft_width, self.raft_height)
+                positions = self._get_dot_positions(self._num_stones, self.raft_width, self.raft_height)
 
                 for num, pos, dot in zip(numbers, positions, tile, strict=False):
                     if not dot.found:
@@ -479,7 +481,7 @@ class Board:
             print(f"An error occurred while generating the board image: {e!s}")
 
     def _make_tiles(self) -> None:
-        total_num = (self._total_spaces - self._empty_spaces) * (self._dots_to_spawn // 2)
+        total_num = ((self._total_spaces - self._empty_spaces) * self._num_stones) // 2
         paired_num = list(range(total_num)) * 2
         random.shuffle(paired_num)
 
@@ -487,7 +489,7 @@ class Board:
             if i < self._empty_spaces:
                 self._tiles.append(self._empty_tiles[i])
             else:
-                dot_numbers = select_unique_numbers(paired_num, self._dots_to_spawn)
+                dot_numbers = select_unique_numbers(paired_num, self._num_stones)
                 self._tiles.append(ActiveTile(i, dot_numbers))
 
                 for num in dot_numbers:
@@ -660,12 +662,12 @@ class ChessCog(commands.Cog):
 
     @commands.slash_command()
     @commands.default_member_permissions(administrator=True)
-    async def game(self, inter: disnake.MessageCommandInteraction, stones: GameDifficulty) -> None:  # noqa: D417
+    async def game(self, inter: disnake.MessageCommandInteraction, difficulty: GameDifficulty) -> None:  # noqa: D417
         """Start a game against the computer.
 
         Parameters
         ----------
-        stones: Choose game difficulty.
+        difficulty: Choose game difficulty.
 
         """
         await inter.response.defer()
@@ -673,7 +675,7 @@ class ChessCog(commands.Cog):
 
         board = game_flow.create_board(
             msg_id=msg.id,
-            num_stones=stones.value,
+            num_stones=difficulty,
             user=inter.author,
             opponent=None,
         )
@@ -683,13 +685,16 @@ class ChessCog(commands.Cog):
 
     @commands.slash_command(name="game-vs")
     @commands.default_member_permissions(administrator=True)
-    async def game_vs(self, inter: disnake.CommandInteraction, opponent: disnake.Member, stones: GameDifficulty) -> None:  # noqa: D417, E501
+    async def game_vs(  # noqa: D417
+        self, inter: disnake.CommandInteraction, opponent: disnake.Member, difficulty: GameDifficulty
+    ) -> None:
         """Start your game.
 
         Parameters
         ----------
+        inter: The interaction.
         opponent: Mention a user you want to play with.
-        stones: Choose game difficulty.
+        difficulty: Choose game difficulty.
 
         """
         await inter.response.defer()
@@ -697,7 +702,7 @@ class ChessCog(commands.Cog):
 
         board = game_flow.create_board(
             msg_id=msg.id,
-            num_stones=stones.value,
+            num_stones=difficulty,
             user=inter.author,
             opponent=opponent,
         )
