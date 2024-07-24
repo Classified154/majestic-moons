@@ -245,13 +245,13 @@ class Board:
         self._lock: asyncio.Lock = asyncio.Lock()
 
         self.padding: dict[str, int] = {
-            "top": 20,
+            "top": 15,
             "bottom": 30,
-            "left": 40,
+            "left": 45,
             "right": 20,
         }
         self.ROCK_SIZE: int = (40, 40)
-        self.font = ImageFont.truetype("../assets/arial.ttf", 20)
+        self.font = ImageFont.truetype("../assets/arial.ttf", 18)
 
         # Load raft images
         self.raft_images = []
@@ -264,7 +264,7 @@ class Board:
 
         # Load rock images
         self.rock_images = []
-        for i in range(1, 11):
+        for i in range(1, 6):
             rock_path = f"../assets/rocks/tile{i:03d}.png"
             if Path.exists(Path(rock_path)):
                 rock_img = Image.open(rock_path).convert("RGBA")
@@ -407,7 +407,7 @@ class Board:
             rock = random.choice(self.rock_images).copy()  # noqa: S311
             draw = ImageDraw.Draw(rock)
             bbox = draw.textbbox((0, 0), number, font=self.font)
-            text_width = bbox[2] - bbox[0]
+            text_width = bbox[2] - bbox[0] - 5
             text_height = bbox[3] - bbox[1] + 10
             position = ((self.ROCK_SIZE[0] - text_width) // 2, (self.ROCK_SIZE[1] - text_height) // 2)
             draw.text(position, number, fill=(255, 255, 255), font=self.font)
