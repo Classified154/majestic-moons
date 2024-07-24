@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 TICK = "✅"
 CROSS = "❌"
+TIME_REMEMBER = 10
 
 
 class TileNotFoundError(Exception):
@@ -426,7 +427,7 @@ class Board:
             text_width = bbox[2] - bbox[0] - 5
             text_height = bbox[3] - bbox[1] + 10
             position = ((self.ROCK_SIZE[0] - text_width) // 2, (self.ROCK_SIZE[1] - text_height) // 2)
-            draw.text(position, number, fill=(255, 255, 255), font=self.font)
+            draw.text(position, number, fill=(0, 0, 0), font=self.font)
         else:
             rock = random.choice(self.rock_images).copy()  # noqa: S311
         return rock
@@ -495,9 +496,10 @@ class Board:
                 for num in dot_numbers:
                     paired_num.remove(num)
 
-    def make_board(self) -> None:
+    def make_board(self) -> disnake.File:
         """Make the board."""
-        print(self._board_size)
+        self._make_tiles()
+        return self._generate_board_img(NumberStatus.VISIBLE)
         # Need to make tiles
         # generate board image
         # setup cords
@@ -541,7 +543,7 @@ class GameFlow:
         opponent: disnake.Member | None,
         dots_to_spawn: int = 4,
         empty_spaces: int = 1,
-    ) -> Board:
+    ) -> tuple[Board, disnake.File]:
         """Create a board."""
         _is_opponent_bot = opponent is None
 
@@ -552,9 +554,9 @@ class GameFlow:
             dots_to_spawn,
             empty_spaces,
         )
-        board.make_board()
+        board_img = board.make_board()
         self._boards.append(board)
-        return board
+        return board, board_img
 
     def get_dot_by_cords(self, msg_id: int, tile_num: int, dot_num: int) -> Dot:
         """Find a dot."""
@@ -673,15 +675,16 @@ class ChessCog(commands.Cog):
         await inter.response.defer()
         msg = await inter.original_message()
 
-        board = game_flow.create_board(
+        board, board_img = game_flow.create_board(
             msg_id=msg.id,
             num_stones=difficulty,
             user=inter.author,
             opponent=None,
         )
-        print("Board created")
+        await inter.edit_original_message("This is your board. Look carefully")
 
-        await inter.edit_original_message(board)
+        message = await inter.channel.send(file=board_img)
+        await message.delete(delay=TIME_REMEMBER)
 
     @commands.slash_command(name="game-vs")
     @commands.default_member_permissions(administrator=True)
@@ -700,7 +703,7 @@ class ChessCog(commands.Cog):
         await inter.response.defer()
         msg = await inter.original_message()
 
-        board = game_flow.create_board(
+        board, board_img = game_flow.create_board(
             msg_id=msg.id,
             num_stones=difficulty,
             user=inter.author,
@@ -708,6 +711,9 @@ class ChessCog(commands.Cog):
         )
 
         await inter.edit_original_message(board)
+        await inter.edit_original_message("This is your board. Look carefully")
+        message = await inter.channel.send(file=board_img)
+        await message.delete(delay=TIME_REMEMBER)
 
 
 class ConfirmDelete(disnake.ui.View):
