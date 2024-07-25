@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 TICK = "✅"
 CROSS = "❌"
-TIME_REMEMBER = 10
+TIME_REMEMBER = 10  # Seconds
 
 
 class TileNotFoundError(Exception):
@@ -234,13 +234,13 @@ class Board:
     def __init__(
         self,
         msg_id: int,
-        num_stones: int,
+        num_stones: GameDifficulty,
         players: list[Player],
         dots_to_spawn: int = 4,
         empty_spaces: int = 1,
     ) -> None:
         self._msg_id: int = msg_id
-        self._num_stones: int = num_stones
+        self._num_stones: int = num_stones.value
         self._board_size: tuple[int, int] = (3, 3)
         self._total_spaces: int = 9  # 3 x 3
         self._dots_to_spawn: int = dots_to_spawn
@@ -278,7 +278,7 @@ class Board:
             rock_path = f"../assets/rocks/tile{i:03d}.png"
             if Path.exists(Path(rock_path)):
                 rock_img = Image.open(rock_path).convert("RGBA")
-                rock_img = rock_img.resize(self.ROCK_SIZE, Image.LANCZOS)
+                rock_img = rock_img.resize(self.ROCK_SIZE, Image.Resampling.LANCZOS)
                 self.rock_images.append(rock_img)
 
         self.raft_offset = 10
@@ -538,7 +538,7 @@ class GameFlow:
     def create_board(
         self,
         msg_id: int,
-        num_stones: int,
+        num_stones: GameDifficulty,
         user: disnake.Member,
         opponent: disnake.Member | None,
         dots_to_spawn: int = 4,
@@ -681,7 +681,7 @@ class ChessCog(commands.Cog):
             user=inter.author,
             opponent=None,
         )
-        await inter.edit_original_message("This is your board. Look carefully")
+        await inter.edit_original_message(f"This is your board. Look carefully \n\nDebug:{board}")
 
         message = await inter.channel.send(file=board_img)
         await message.delete(delay=TIME_REMEMBER)
@@ -710,8 +710,7 @@ class ChessCog(commands.Cog):
             opponent=opponent,
         )
 
-        await inter.edit_original_message(board)
-        await inter.edit_original_message("This is your board. Look carefully")
+        await inter.edit_original_message(f"This is your board. Look carefully\n\nDebug:{board}", view=MainView())
         message = await inter.channel.send(file=board_img)
         await message.delete(delay=TIME_REMEMBER)
 
