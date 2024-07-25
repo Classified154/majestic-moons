@@ -246,20 +246,21 @@ class Board:
         empty_spaces: int = 1,
     ) -> None:
         self._msg_id: int = msg_id
-        self._num_stones: int = num_stones.value
+        self._num_stones: int = num_stones
         self._board_size: tuple[int, int] = (3, 3)
         self._total_spaces: int = 9  # 3 x 3
         self._dots_to_spawn: int = dots_to_spawn
         self._empty_spaces: int = empty_spaces
         self._user: Player = players[0]
-        self._opponent: Player = players[1]
+        self._opponent: Player = players[-1]
 
         self._tiles: list[ActiveTile | EmptyTile] = []
 
         self._empty_tiles: list[EmptyTile] = [EmptyTile(self._total_spaces - i - 1) for i in range(empty_spaces)]
 
         self._lock: asyncio.Lock = asyncio.Lock()
-
+        self._user.turn = True
+        self._opponent.turn = False
         self.padding: dict[str, int] = {
             "top": 15,
             "bottom": 30,
@@ -339,10 +340,11 @@ class Board:
         """Return the current player."""
         return self._user if self._user.turn else self._opponent
 
-    def _change_turn(self) -> None:
-        if self._user.turn:
-            self._user.turn = False
-            self._opponent.turn = True
+    def change_turn(self) -> None:
+        """Switches the turn of players."""
+        if self._opponent is not None:
+            self._user.turn = not self._user.turn
+            self._opponent.turn = not self._opponent.turn
         else:
             self._user.turn = True
             self._opponent.turn = False
@@ -593,10 +595,10 @@ game_flow: GameFlow = GameFlow()
 class TurnDropdown(disnake.ui.Select):
     """A dropdown that lets user choose from tile and dot coordinates."""
 
-    def __init__(self, label: str, board: Board) -> None:
+    def __init__(self, label: str, board: Board, cords: int | None = None) -> None:
         self.label = label
         self.board = board
-        lst_to_iter: list = board.active_tiles if label == "Tile" else board[self.view.tile_cords].dots_not_found
+        lst_to_iter: list = board.active_tiles if label == "Tile" else board[cords].dots_not_found
         options = [
             *(
                 disnake.SelectOption(label=f"{_index + 1}", value=f"{_index + 1}")
@@ -619,8 +621,8 @@ class TurnDropdown(disnake.ui.Select):
             for i, _c in enumerate(self.view.children):
                 if i > 0:
                     self.view.remove_item(_c)
-            self.view.tile_cords = _cords
-            self.view.add_item(TurnDropdown("Dot", self.board))
+
+            self.view.add_item(TurnDropdown("Dot", self.board, _cords))
             await inter.response.edit_message(view=self.view)
         else:
             self.view.dot_cords = _cords
@@ -634,6 +636,7 @@ class TurnView(disnake.ui.View):
         super().__init__(timeout=None)
         self.tile_cords = 0
         self.dot_cords = 0
+        self.board = board
         self.add_item(TurnDropdown("Tile", board))
 
     async def finish_view(self, inter: disnake.MessageInteraction) -> None:
@@ -650,6 +653,7 @@ class TurnView(disnake.ui.View):
         # Update the board
         # Check if the game is over
         # Change the turn
+        self.board.change_turn()
 
 
 class MainView(disnake.ui.View):
@@ -677,6 +681,7 @@ class MainView(disnake.ui.View):
         await inter.response.send_message(view=view, ephemeral=True)
 
         await view.wait()
+
         self.play_turn.disabled = False
         await inter.message.edit(view=self)
 
@@ -728,7 +733,10 @@ class ChessCog(commands.Cog):
         await inter.edit_original_message(f"This is your board. Look carefully \n\nDebug:{board}")
 
         message = await inter.channel.send(file=board_img)
-        await message.delete(delay=TIME_REMEMBER)
+        await asyncio.sleep(TIME_REMEMBER)
+        await message.delete()
+        view = MainView()
+        await msg.edit("Click the button to play your turn.", view=view)
 
     @commands.slash_command(name="game-vs")
     @commands.default_member_permissions(administrator=True)
