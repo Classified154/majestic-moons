@@ -219,13 +219,19 @@ class ActiveTile(Tile):
     def is_moved(self, value: bool) -> None:
         self._is_moved = value
 
+    @property
+    def dots_found(self) -> list[Dot]:
+        """Show the dots that are found."""
+        return [dot for dot in self._dots if dot.found]
+
+    @property
+    def dots_not_found(self) -> list[Dot]:
+        """Show the dots that are not found."""
+        return [dot for dot in self._dots if not dot.found]
+
     def set_dot_found(self, position: int) -> None:
         """Mark a dot as found."""
         self._dots[position].found = True
-
-    def show_dot_found(self) -> list[Dot]:
-        """Show the dots that are found."""
-        return [dot for dot in self._dots if dot.found]
 
 
 class Board:
@@ -317,6 +323,11 @@ class Board:
     def all_tiles(self) -> list[ActiveTile | EmptyTile]:
         """Return all tiles."""
         return self._tiles
+
+    @property
+    def active_tiles(self) -> list[ActiveTile]:
+        """Return all active tiles."""
+        return [tile for tile in self.all_tiles if isinstance(tile, ActiveTile)]
 
     @property
     def all_players_id(self) -> list[int]:
@@ -579,39 +590,66 @@ class GameFlow:
 game_flow: GameFlow = GameFlow()
 
 
-class TurnModal(disnake.ui.Modal):
-    """A modal that prompts the user to enter the tile and dot coordinates for their turn."""
+class TurnDropdown(disnake.ui.Select):
+    """A dropdown that lets user choose from tile and dot coordinates."""
 
-    def __init__(self) -> None:
-        components = [
-            disnake.ui.TextInput(
-                label="Tile Coordinates",
-                custom_id="tile_cords",
-                style=disnake.TextInputStyle.short,
-                placeholder="Enter the tile coordinates (e.g., 1,2)",
-                min_length=3,
-                max_length=5,
-            ),
-            disnake.ui.TextInput(
-                label="Dot Coordinates",
-                custom_id="dot_cords",
-                style=disnake.TextInputStyle.short,
-                placeholder="Enter the dot number (e.g., 1)",
-                min_length=1,
-                max_length=2,
+    def __init__(self, label: str, board: Board) -> None:
+        self.label = label
+        self.board = board
+        lst_to_iter: list = board.active_tiles if label == "Tile" else board[self.view.tile_cords].dots_not_found
+        options = [
+            *(
+                disnake.SelectOption(label=f"{_index + 1}", value=f"{_index + 1}")
+                for _index in range(len(lst_to_iter))
             ),
         ]
-        super().__init__(title="Your Turn", custom_id="turn_modal", components=components)
 
-    async def callback(self, inter: disnake.ModalInteraction) -> None:
-        """Modal Callback."""
-        tile_cords = inter.text_values["tile_cords"]
-        dot_cords = inter.text_values["dot_cords"]
+        super().__init__(
+            placeholder=f"Choose a {label}",
+            max_values=1,
+            options=options,
+            custom_id=f"{label.lower()}_dropdown",
+        )
+
+    async def callback(self, inter: disnake.MessageInteraction) -> None:
+        """Dropdown callback."""
+        _cords = int(inter.resolved_values[0]) - 1
+
+        if self.label == "Tile":
+            for i, _c in enumerate(self.view.children):
+                if i > 0:
+                    self.view.remove_item(_c)
+            self.view.tile_cords = _cords
+            self.view.add_item(TurnDropdown("Dot", self.board))
+            await inter.response.edit_message(view=self.view)
+        else:
+            self.view.dot_cords = _cords
+            await self.view.finish_view(inter)
+
+
+class TurnView(disnake.ui.View):
+    """A view that contain dropdown."""
+
+    def __init__(self, board: Board) -> None:
+        super().__init__(timeout=None)
+        self.tile_cords = 0
+        self.dot_cords = 0
+        self.add_item(TurnDropdown("Tile", board))
+
+    async def finish_view(self, inter: disnake.MessageInteraction) -> None:
+        """Finish the view."""
+        self.clear_items()
+        self.stop()
         # Process inputs here
         await inter.response.send_message(
-            f"Tile coordinates: {tile_cords}, Dot coordinates: {dot_cords}",
+            f"Tile coordinates: {self.tile_cords}, Dot coordinates: {self.dot_cords}, "
+            f"Dot you selected is {game_flow[inter.message.id][int(self.tile_cords)][int(self.dot_cords)]}",
             ephemeral=True,
+            view=self,
         )
+        # Update the board
+        # Check if the game is over
+        # Change the turn
 
 
 class MainView(disnake.ui.View):
@@ -633,8 +671,14 @@ class MainView(disnake.ui.View):
             await inter.response.send_message("Please wait for your turn!", ephemeral=True)
             return
 
-        modal = TurnModal()
-        await inter.response.send_modal(modal)
+        view = TurnView(board)
+        self.play_turn.disabled = True
+        await inter.message.edit(view=self)
+        await inter.response.send_message(view=view, ephemeral=True)
+
+        await view.wait()
+        self.play_turn.disabled = False
+        await inter.message.edit(view=self)
 
 
 class ChessCog(commands.Cog):
