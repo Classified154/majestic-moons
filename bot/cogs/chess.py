@@ -246,7 +246,7 @@ class Board:
         empty_spaces: int = 1,
     ) -> None:
         self._msg_id: int = msg_id
-        self._num_stones: int = num_stones
+        self._num_stones: int = num_stones.value
         self._board_size: tuple[int, int] = (3, 3)
         self._total_spaces: int = 9  # 3 x 3
         self._dots_to_spawn: int = dots_to_spawn
@@ -595,10 +595,10 @@ game_flow: GameFlow = GameFlow()
 class TurnDropdown(disnake.ui.Select):
     """A dropdown that lets user choose from tile and dot coordinates."""
 
-    def __init__(self, label: str, board: Board, cords: int | None = None) -> None:
+    def __init__(self, label: str, board: Board) -> None:
         self.label = label
         self.board = board
-        lst_to_iter: list = board.active_tiles if label == "Tile" else board[cords].dots_not_found
+        lst_to_iter: list = board.active_tiles if label == "Tile" else board[self.view.tile_cords].dots_not_found
         options = [
             *(
                 disnake.SelectOption(label=f"{_index + 1}", value=f"{_index + 1}")
@@ -621,8 +621,8 @@ class TurnDropdown(disnake.ui.Select):
             for i, _c in enumerate(self.view.children):
                 if i > 0:
                     self.view.remove_item(_c)
-
-            self.view.add_item(TurnDropdown("Dot", self.board, _cords))
+            self.view.tile_cords = _cords
+            self.view.add_item(TurnDropdown("Dot", self.board))
             await inter.response.edit_message(view=self.view)
         else:
             self.view.dot_cords = _cords
@@ -736,7 +736,7 @@ class ChessCog(commands.Cog):
         await asyncio.sleep(TIME_REMEMBER)
         await message.delete()
         view = MainView()
-        await msg.edit("Click the button to play your turn.", view=view)
+        await inter.edit_original_message("Click the button to play your turn.", view=view)
 
     @commands.slash_command(name="game-vs")
     @commands.default_member_permissions(administrator=True)
