@@ -342,9 +342,10 @@ class Board:
 
     def change_turn(self) -> None:
         """Switches the turn of players."""
-        if self._opponent is not None:
-            self._user.turn = not self._user.turn
-            self._opponent.turn = not self._opponent.turn
+        if self._user.turn:
+            if not self._opponent.bot:
+                self._user.turn = not self._user.turn
+                self._opponent.turn = not self._opponent.turn
         else:
             self._user.turn = True
             self._opponent.turn = False
