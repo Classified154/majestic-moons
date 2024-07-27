@@ -593,13 +593,13 @@ class GameFlow:
 game_flow: GameFlow = GameFlow()
 
 
-class TurnDropdown(disnake.ui.Select):
+class TurnDropdown(disnake.ui.StringSelect):
     """A dropdown that lets user choose from tile and dot coordinates."""
 
-    def __init__(self, label: str, board: Board) -> None:
+    def __init__(self, label: str, board: Board, dot_list: list[Dot] | None = None) -> None:
         self.label = label
         self.board = board
-        lst_to_iter: list = board.active_tiles if label == "Tile" else board[self.view.tile_cords].dots_not_found
+        lst_to_iter: list = board.active_tiles if label == "Tile" else dot_list
         options = [
             *(
                 disnake.SelectOption(label=f"{_index + 1}", value=f"{_index + 1}")
@@ -623,7 +623,7 @@ class TurnDropdown(disnake.ui.Select):
                 if i > 0:
                     self.view.remove_item(_c)
             self.view.tile_cords = _cords
-            self.view.add_item(TurnDropdown("Dot", self.board))
+            self.view.add_item(TurnDropdown("Dot", self.board, self.board[self.view.tile_cords].dots_not_found))
             await inter.response.edit_message(view=self.view)
         else:
             self.view.dot_cords = _cords
@@ -633,11 +633,12 @@ class TurnDropdown(disnake.ui.Select):
 class TurnView(disnake.ui.View):
     """A view that contain dropdown."""
 
-    def __init__(self, board: Board) -> None:
+    def __init__(self, board: Board, msg_id: int) -> None:
         super().__init__(timeout=None)
         self.tile_cords = 0
         self.dot_cords = 0
         self.board = board
+        self.msg_id = msg_id
         self.add_item(TurnDropdown("Tile", board))
 
     async def finish_view(self, inter: disnake.MessageInteraction) -> None:
@@ -647,7 +648,7 @@ class TurnView(disnake.ui.View):
         # Process inputs here
         await inter.response.send_message(
             f"Tile coordinates: {self.tile_cords}, Dot coordinates: {self.dot_cords}, "
-            f"Dot you selected is {game_flow[inter.message.id][int(self.tile_cords)][int(self.dot_cords)]}",
+            f"Dot you selected is {game_flow[self.msg_id][int(self.tile_cords)][int(self.dot_cords)]}",
             ephemeral=True,
             view=self,
         )
@@ -676,7 +677,7 @@ class MainView(disnake.ui.View):
             await inter.response.send_message("Please wait for your turn!", ephemeral=True)
             return
 
-        view = TurnView(board)
+        view = TurnView(board, msg_id=inter.message.id)
         self.play_turn.disabled = True
         await inter.message.edit(view=self)
         await inter.response.send_message(view=view, ephemeral=True)
