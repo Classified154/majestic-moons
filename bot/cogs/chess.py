@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
 from pathlib import Path
+from typing import Union
 
 import disnake
 from disnake.ext import commands
@@ -143,6 +144,7 @@ class Tile:
     def __init__(self, num: int, empty: TileStatus) -> None:
         self._num = num
         self._empty: TileStatus = empty
+        # self._all_found = False
 
     def __repr__(self) -> str:
         return f"Tile(Number:{self._num})"
@@ -268,7 +270,7 @@ class Board:
             "right": 20,
         }
         self.ROCK_SIZE: tuple[int, int] = (40, 40)
-        self.font = ImageFont.truetype("../assets/Montserrat-Regular.otf", 16)
+        self.font = ImageFont.truetype("../assets/arial.ttf", 18)
 
         # Load raft images
         self.raft_images = []
@@ -288,7 +290,7 @@ class Board:
                 rock_img = rock_img.resize(self.ROCK_SIZE, Image.Resampling.LANCZOS)
                 self.rock_images.append(rock_img)
 
-        self.raft_offset = 0
+        self.raft_offset = 10
         self.board_width: int = (self._board_size[0] * self.raft_width) + ((self._board_size[0] - 1) * 10)
         self.board_height: int = (self._board_size[1] * self.raft_height) + ((self._board_size[1] - 1) * 10)
 
@@ -593,6 +595,35 @@ class GameFlow:
                 return board[tile_num]
 
         raise BoardNotFoundError(msg_id)
+
+
+    def win_check(self, msg_id: int, tile1_num: int, tile2_num: int, dot1_num: int, dot2_num: int) -> Union[bool, str]:
+        """Checks if the dots match"""
+        for board in self._boards:
+            if board.msg_id == msg_id:
+                board = board
+
+        for tile in board._tiles:
+            for dot in tile._dots:
+                if dot._found:
+                    continue
+                else:
+                    break
+            return "win"
+
+        for board in self._boards:
+            if board.msg_id == msg_id:
+                tile1 = board[tile1_num]
+
+        for board in self._boards:
+            if board.msg_id == msg_id:
+                tile2 = board[tile2_num]
+
+        if dot1_num in tile1._dots and dot2_num in tile2._dots:
+            return True
+        
+        return False
+        
 
 
 game_flow: GameFlow = GameFlow()
