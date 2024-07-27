@@ -227,7 +227,7 @@ class ActiveTile(Tile):
 
     @property
     def dots(self) -> list[Dot]:
-        """Returns the list of all the dots"""
+        """Returns the list of all the dots."""
         return self._dots
 
     @property
@@ -605,10 +605,12 @@ class GameFlow:
 
         raise BoardNotFoundError(msg_id)
 
+    def pair_check(self, coords: dict) -> bool:
+        """Check if the dots match."""
 
-    def win_check(self, msg_id: int, tile1_num: int, tile2_num: int, dot1_num: int, dot2_num: int) -> bool | str:
-        """Checks if the dots match."""
-        win = False
+    def win_check(self, msg_id: int) -> bool:
+        """Check for win."""
+        num_tiles = 0
 
         for board in self.boards:
             if board.msg_id == msg_id:
@@ -616,23 +618,9 @@ class GameFlow:
 
         for tile in check_board.all_tiles:
             if tile.all_found:
-                continue
-            win = True
-            break
+                num_tiles += 1
 
-        if win:
-            return "win"
-
-        for board in self.boards:
-            if board.msg_id == msg_id:
-                tile1 = board[tile1_num]
-
-        for board in self.boards:
-            if board.msg_id == msg_id:
-                tile2 = board[tile2_num]
-        
-        return False
-        
+        return num_tiles == 8 # noqa: PLR2004
 
 
 game_flow: GameFlow = GameFlow()
