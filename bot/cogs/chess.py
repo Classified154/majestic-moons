@@ -246,7 +246,7 @@ class Board:
         empty_spaces: int = 1,
     ) -> None:
         self._msg_id: int = msg_id
-        self._num_stones: int = num_stones
+        self._num_stones: int = num_stones  # 3, 4, 5
         self._board_size: tuple[int, int] = (3, 3)
         self._total_spaces: int = 9  # 3 x 3
         self._dots_to_spawn: int = dots_to_spawn
@@ -256,7 +256,7 @@ class Board:
 
         self._tiles: list[ActiveTile | EmptyTile] = []
 
-        self._empty_tiles: list[EmptyTile] = [EmptyTile(self._total_spaces - i - 1) for i in range(empty_spaces)]
+        self._empty_tiles: list[EmptyTile] = []
 
         self._lock: asyncio.Lock = asyncio.Lock()
         self._user.turn = True
@@ -501,14 +501,19 @@ class Board:
         random.shuffle(paired_num)
 
         for i in range(self._total_spaces):
-            if i < self._empty_spaces:
-                self._tiles.append(self._empty_tiles[i])
+            if i > (self._total_spaces - self._empty_spaces - 1):
+                empty_tile = EmptyTile(i)
+                self._tiles.append(empty_tile)
+                self._empty_tiles.append(empty_tile)
+                print(f"Empty tile {i} added")
             else:
                 dot_numbers = select_unique_numbers(paired_num, self._num_stones)
                 self._tiles.append(ActiveTile(i, dot_numbers))
 
                 for num in dot_numbers:
                     paired_num.remove(num)
+
+                print(f"Active tile {i} added")
 
     def make_board(self) -> disnake.File:
         """Make the board."""
