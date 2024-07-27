@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from enum import Enum
 from io import BytesIO
 from pathlib import Path
-from typing import Union
 
 import disnake
 from disnake.ext import commands
@@ -144,7 +143,7 @@ class Tile:
     def __init__(self, num: int, empty: TileStatus) -> None:
         self._num = num
         self._empty: TileStatus = empty
-        # self._all_found = False
+        self._all_found: bool = False
 
     def __repr__(self) -> str:
         return f"Tile(Number:{self._num})"
@@ -156,6 +155,11 @@ class Tile:
     def is_empty(self) -> bool:
         """Return if the tile is empty."""
         return self._empty == TileStatus.EMPTY
+
+    @property
+    def all_found(self) -> bool:
+        """Return if all dots on the tile are found."""
+        return self._all_found
 
     @property
     def num(self) -> int:
@@ -220,6 +224,11 @@ class ActiveTile(Tile):
     @is_moved.setter
     def is_moved(self, value: bool) -> None:
         self._is_moved = value
+
+    @property
+    def dots(self) -> list[Dot]:
+        """Returns the list of all the dots"""
+        return self._dots
 
     @property
     def dots_found(self) -> list[Dot]:
@@ -597,30 +606,30 @@ class GameFlow:
         raise BoardNotFoundError(msg_id)
 
 
-    def win_check(self, msg_id: int, tile1_num: int, tile2_num: int, dot1_num: int, dot2_num: int) -> Union[bool, str]:
-        """Checks if the dots match"""
-        for board in self._boards:
-            if board.msg_id == msg_id:
-                board = board
+    def win_check(self, msg_id: int, tile1_num: int, tile2_num: int, dot1_num: int, dot2_num: int) -> bool | str:
+        """Checks if the dots match."""
+        win = False
 
-        for tile in board._tiles:
-            for dot in tile._dots:
-                if dot._found:
-                    continue
-                else:
-                    break
+        for board in self.boards:
+            if board.msg_id == msg_id:
+                check_board = board
+
+        for tile in check_board.all_tiles:
+            if tile.all_found:
+                continue
+            win = True
+            break
+
+        if win:
             return "win"
 
-        for board in self._boards:
+        for board in self.boards:
             if board.msg_id == msg_id:
                 tile1 = board[tile1_num]
 
-        for board in self._boards:
+        for board in self.boards:
             if board.msg_id == msg_id:
                 tile2 = board[tile2_num]
-
-        if dot1_num in tile1._dots and dot2_num in tile2._dots:
-            return True
         
         return False
         
