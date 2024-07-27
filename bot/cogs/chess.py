@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import random
 from dataclasses import dataclass
@@ -122,6 +124,9 @@ class Dot:
     def __str__(self) -> str:
         return self.__repr__()
 
+    def __eq__(self, other: Dot) -> bool:
+        return self.num == other.num
+
     @property
     def num(self) -> int:
         """Return the number."""
@@ -143,7 +148,6 @@ class Tile:
     def __init__(self, num: int, empty: TileStatus) -> None:
         self._num = num
         self._empty: TileStatus = empty
-        self._all_found: bool = False
 
     def __repr__(self) -> str:
         return f"Tile(Number:{self._num})"
@@ -226,9 +230,9 @@ class ActiveTile(Tile):
         self._is_moved = value
 
     @property
-    def dots(self) -> list[Dot]:
-        """Returns the list of all the dots."""
-        return self._dots
+    def all_found(self) -> bool:
+        """Return if all dots are found."""
+        return all(dot.found for dot in self._dots)
 
     @property
     def dots_found(self) -> list[Dot]:
@@ -590,37 +594,31 @@ class GameFlow:
 
     def get_dot_by_cords(self, msg_id: int, tile_num: int, dot_num: int) -> Dot:
         """Find a dot."""
-        for board in self._boards:
-            if board.msg_id == msg_id:
-                tile = board[tile_num]
-                return tile[dot_num]
-
-        raise BoardNotFoundError(msg_id)
+        tile = self.__getitem__(msg_id)[tile_num]
+        return tile[dot_num]
 
     def get_tile_by_cords(self, msg_id: int, tile_num: int) -> ActiveTile | EmptyTile:
         """Find a tile."""
-        for board in self._boards:
-            if board.msg_id == msg_id:
-                return board[tile_num]
+        return self.__getitem__(msg_id)[tile_num]
 
-        raise BoardNotFoundError(msg_id)
+    def match_dot(self, msg_id: int, tile1_num: int, tile2_num: int, dot1_num: int, dot2_num: int) -> bool:
+        """Dots match check."""
+        board = self.__getitem__(msg_id)
 
-    def pair_check(self, coords: dict) -> bool:
-        """Check if the dots match."""
+        dot_1 = board[tile1_num][dot1_num]
+        dot_2 = board[tile2_num][dot2_num]
+
+        if dot_1 == dot_2:
+            board[tile1_num].set_dot_found(dot1_num)
+            board[tile2_num].set_dot_found(dot2_num)
+            return True
+
+        return False
 
     def win_check(self, msg_id: int) -> bool:
-        """Check for win."""
-        num_tiles = 0
-
-        for board in self.boards:
-            if board.msg_id == msg_id:
-                check_board = board
-
-        for tile in check_board.all_tiles:
-            if tile.all_found:
-                num_tiles += 1
-
-        return num_tiles == 8 # noqa: PLR2004
+        """Win check."""
+        board = self.__getitem__(msg_id)
+        return all(tile.all_found for tile in board.active_tiles)
 
 
 game_flow: GameFlow = GameFlow()
@@ -658,8 +656,23 @@ class TurnDropdown(disnake.ui.StringSelect):
             self.view.tile_cords = _cords
             self.view.add_item(TurnDropdown("Dot", self.board, self.board[self.view.tile_cords].dots_not_found))
             await inter.response.edit_message(view=self.view)
-        else:
+
+        elif self.label == "Dot":
             self.view.dot_cords = _cords
+            for _c in self.view.children:
+                self.view.remove_item(_c)
+            self.view.add_item(TurnDropdown("2nd Tile", self.board))
+
+        elif self.label == "2nd Tile":
+            self.view.tile_cords_2 = _cords
+            for i, _c in enumerate(self.view.children):
+                if i > 0:
+                    self.view.remove_item(_c)
+            self.view.add_item(TurnDropdown("2nd Dot", self.board, self.board[self.view.tile_cords_2].dots_not_found))
+            await inter.response.edit_message(view=self.view)
+
+        else:
+            self.view.dot_cords_2 = _cords
             await self.view.finish_view(inter)
 
 
@@ -670,6 +683,8 @@ class TurnView(disnake.ui.View):
         super().__init__(timeout=None)
         self.tile_cords = 0
         self.dot_cords = 0
+        self.tile_cords_2 = 0
+        self.dot_cords_2 = 0
         self.board = board
         self.msg_id = msg_id
         self.add_item(TurnDropdown("Tile", board))
@@ -679,10 +694,10 @@ class TurnView(disnake.ui.View):
         self.clear_items()
         self.stop()
         # Process inputs here
-        await inter.response.send_message(
+
+        await inter.response.edit_message(
             f"Tile coordinates: {self.tile_cords}, Dot coordinates: {self.dot_cords}, "
             f"Dot you selected is {game_flow[self.msg_id][int(self.tile_cords)][int(self.dot_cords)]}",
-            ephemeral=True,
             view=self,
         )
         # Update the board
