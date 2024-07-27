@@ -630,7 +630,7 @@ class TurnDropdown(disnake.ui.StringSelect):
     def __init__(self, label: str, board: Board, dot_list: list[Dot] | None = None) -> None:
         self.label = label
         self.board = board
-        lst_to_iter: list = board.active_tiles if label == "Tile" else dot_list
+        lst_to_iter: list = board.active_tiles if label in ["Tile", "2nd Tile"] else dot_list
         options = [
             *(
                 disnake.SelectOption(label=f"{_index + 1}", value=f"{_index + 1}")
@@ -650,18 +650,18 @@ class TurnDropdown(disnake.ui.StringSelect):
         _cords = int(inter.resolved_values[0]) - 1
 
         if self.label == "Tile":
+            self.view.tile_cords = _cords
             for i, _c in enumerate(self.view.children):
                 if i > 0:
                     self.view.remove_item(_c)
-            self.view.tile_cords = _cords
             self.view.add_item(TurnDropdown("Dot", self.board, self.board[self.view.tile_cords].dots_not_found))
             await inter.response.edit_message(view=self.view)
 
         elif self.label == "Dot":
             self.view.dot_cords = _cords
-            for _c in self.view.children:
-                self.view.remove_item(_c)
+            self.view.clear_items()
             self.view.add_item(TurnDropdown("2nd Tile", self.board))
+            await inter.response.edit_message(view=self.view)
 
         elif self.label == "2nd Tile":
             self.view.tile_cords_2 = _cords
