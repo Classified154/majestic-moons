@@ -268,7 +268,7 @@ class Board:
             "right": 20,
         }
         self.ROCK_SIZE: tuple[int, int] = (40, 40)
-        self.font = ImageFont.truetype("../assets/arial.ttf", 18)
+        self.font = ImageFont.truetype("../assets/Montserrat-Regular.otf", 16)
 
         # Load raft images
         self.raft_images = []
@@ -288,7 +288,7 @@ class Board:
                 rock_img = rock_img.resize(self.ROCK_SIZE, Image.Resampling.LANCZOS)
                 self.rock_images.append(rock_img)
 
-        self.raft_offset = 10
+        self.raft_offset = 0
         self.board_width: int = (self._board_size[0] * self.raft_width) + ((self._board_size[0] - 1) * 10)
         self.board_height: int = (self._board_size[1] * self.raft_height) + ((self._board_size[1] - 1) * 10)
 
