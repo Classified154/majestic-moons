@@ -246,7 +246,7 @@ class Board:
         empty_spaces: int = 1,
     ) -> None:
         self._msg_id: int = msg_id
-        self._num_stones: int = num_stones.value
+        self._num_stones: int = num_stones
         self._board_size: tuple[int, int] = (3, 3)
         self._total_spaces: int = 9  # 3 x 3
         self._dots_to_spawn: int = dots_to_spawn
