@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 TICK = "✅"
 CROSS = "❌"
-TIME_REMEMBER = 10  # Seconds
+TIME_REMEMBER = 4  # Seconds
 
 
 class TileNotFoundError(Exception):
@@ -241,7 +241,7 @@ class ActiveTile(Tile):
 
     def set_dot_found(self, position: int) -> None:
         """Mark a dot as found."""
-        self._dots[position].found = True
+        self.dots_found[position].found = True
 
 
 class Board:
@@ -309,10 +309,9 @@ class Board:
         return f"Board(Message ID:{self._msg_id}, Size:{self._board_size}, Players:{self._user}, {self._opponent})"
 
     def __getitem__(self, index: int) -> ActiveTile | EmptyTile:
-        for t in self.all_tiles:
+        for t in self._tiles:
             if t.num == index:
                 return t
-
         raise TileNotFoundError(index)
 
     @property
@@ -360,7 +359,7 @@ class Board:
             self._user.turn = True
             self._opponent.turn = False
 
-    def find_movable(self, tile: Tile) -> list[ActiveTile]:
+    def _find_movable(self, tile: Tile) -> list[ActiveTile]:
         """Return the index of all adjacent tiles."""
         adjacent_tiles = []
 
@@ -386,12 +385,12 @@ class Board:
 
         return adjacent_tiles
 
-    def _move_tiles(self) -> None:
+    def move_tiles(self) -> None:
         """Move the Empty tiles."""
         # We should move the empty itself to another position exchanging it with a filled tile
         moved_tiles = []
         for tile in self._empty_tiles:
-            chosen_tile = random.choice(self.find_movable(tile))  # noqa: S311
+            chosen_tile = random.choice(self._find_movable(tile))  # noqa: S311
             temp_tile = chosen_tile.num
             chosen_tile.num = tile.num
             tile.num = temp_tile
@@ -529,9 +528,10 @@ class Board:
         """Make the board."""
         self._make_tiles()
         return self._generate_board_img(NumberStatus.VISIBLE)
-        # Need to make tiles
-        # generate board image
-        # setup cords
+
+    def debug_image(self) -> disnake.File:
+        """Make the board."""
+        return self._generate_board_img(NumberStatus.VISIBLE)
 
 
 class GameFlow:
@@ -587,28 +587,33 @@ class GameFlow:
         self._boards.append(board)
         return board, board_img
 
-    def get_dot_by_cords(self, msg_id: int, tile_num: int, dot_num: int) -> Dot:
-        """Find a dot."""
-        tile = self.__getitem__(msg_id)[tile_num]
-        return tile[dot_num]
-
-    def get_tile_by_cords(self, msg_id: int, tile_num: int) -> ActiveTile | EmptyTile:
-        """Find a tile."""
-        return self.__getitem__(msg_id)[tile_num]
-
-    def match_dot(self, msg_id: int, tile1_num: int, tile2_num: int, dot1_num: int, dot2_num: int) -> bool:
+    def match_dot(
+        self, msg_id: int, tile1_num: int, tile2_num: int, dot1_num: int, dot2_num: int
+    ) -> tuple[bool, Dot, Dot]:
         """Dots match check."""
         board = self.__getitem__(msg_id)
 
-        dot_1 = board[tile1_num][dot1_num]
-        dot_2 = board[tile2_num][dot2_num]
+        tile1 = board[tile1_num]
+        tile2 = board[tile2_num]
+        dot_1 = None
+        dot_2 = None
+        for d in tile1.dots_not_found:
+            if tile1.dots_not_found.index(d) == dot1_num:
+                dot_1 = d
+                break
 
+        for d in tile2.dots_not_found:
+            if tile2.dots_not_found.index(d) == dot2_num:
+                dot_2 = d
+                break
+
+        print(dot_1, dot_2)
         if dot_1 == dot_2:
             board[tile1_num].set_dot_found(dot1_num)
             board[tile2_num].set_dot_found(dot2_num)
-            return True
+            return True, dot_1, dot_2
 
-        return False
+        return False, dot_1, dot_2
 
     def win_check(self, msg_id: int) -> bool:
         """Win check."""
@@ -626,6 +631,7 @@ class TurnDropdown(disnake.ui.StringSelect):
         self.label = label
         self.board = board
         lst_to_iter: list = board.active_tiles if label in ["Tile", "2nd Tile"] else dot_list
+
         options = [
             *(
                 disnake.SelectOption(label=f"{_index + 1}", value=f"{_index + 1}")
@@ -690,31 +696,26 @@ class TurnView(disnake.ui.View):
     async def finish_view(self, inter: disnake.MessageInteraction) -> None:
         """Finish the view."""
         self.clear_items()
-        self.stop()
 
-        match_check = game_flow.match_dot(
+        match_check, dot_1, dot_2 = game_flow.match_dot(
             self.msg_id, self.tile_cords, self.tile_cords_2, self.dot_cords, self.dot_cords_2
         )
         if match_check:
             game_flow.win_check(self.msg_id)
             self.matched = True
             await inter.response.edit_message(
-                f"You chose-"
-                f"T- {self.tile_cords}, D- {self.dot_cords}, "
-                f"T2- {self.tile_cords_2}, D2- {self.dot_cords_2}, "
-                f"## Matched!",
+                f"You chose-" f"{dot_1}" f"{dot_2}",
                 view=self,
             )
         else:
             await inter.response.edit_message(
-                f"You chose-"
-                f"T- {self.tile_cords}, D- {self.dot_cords}, "
-                f"T2- {self.tile_cords_2}, D2- {self.dot_cords_2}, "
-                f"## Not Matched!",
+                f"You chose-" f"{dot_1}" f"{dot_2}",
                 view=self,
             )
 
         self.board.change_turn()
+        self.board.move_tiles()
+        self.stop()
 
 
 class MainView(disnake.ui.View):
@@ -749,7 +750,7 @@ class MainView(disnake.ui.View):
 
         self.play_turn.label = "Play Turn"
         self.play_turn.disabled = False
-        await inter.message.edit(view=self)
+        await inter.message.edit(view=self, file=board.debug_image(), attachments=[])
 
 
 class ChessCog(commands.Cog):
@@ -758,12 +759,6 @@ class ChessCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.persistence_views = False
-
-    async def cog_load(self) -> None:
-        """When the cog is loaded."""
-        await self.bot.wait_until_ready()
-
-        """To load data from sqlite if needed"""
 
     @commands.Cog.listener()
     async def on_ready(self) -> None:
@@ -796,71 +791,10 @@ class ChessCog(commands.Cog):
             user=inter.author,
             opponent=None,
         )
-        await inter.edit_original_message(f"This is your board. Look carefully \n\nDebug:{board}", file=board_img)
-        await asyncio.sleep(TIME_REMEMBER)
+        await inter.edit_original_message(f"This is your board. Look carefully \n\nDebug: {board}", file=board_img)
+        await asyncio.sleep(TIME_REMEMBER * (10 - difficulty))
         view = MainView()
-        await inter.edit_original_message("Click the button to play your turn.", view=view)
-
-    @commands.slash_command(name="game-vs")
-    @commands.default_member_permissions(administrator=True)
-    async def game_vs(  # noqa: D417
-        self, inter: disnake.CommandInteraction, opponent: disnake.Member, difficulty: GameDifficulty
-    ) -> None:
-        """Start your game.
-
-        Parameters
-        ----------
-        inter: The interaction.
-        opponent: Mention a user you want to play with.
-        difficulty: Choose game difficulty.
-
-        """
-        await inter.response.defer()
-        msg = await inter.original_message()
-
-        board, board_img = game_flow.create_board(
-            msg_id=msg.id,
-            num_stones=difficulty,
-            user=inter.author,
-            opponent=opponent,
-        )
-
-        await inter.edit_original_message(f"This is your board. Look carefully\n\nDebug:{board}", view=MainView())
-        message = await inter.channel.send(file=board_img)
-        await message.delete(delay=TIME_REMEMBER)
-
-
-class ConfirmDelete(disnake.ui.View):
-    """Confirm Delete class."""
-
-    def __init__(self, author_id: int) -> None:
-        super().__init__(timeout=None)
-        self.author_id = author_id
-        self.confirm = False
-
-    async def interaction_check(self, inter: disnake.MessageInteraction) -> None:
-        """Check if the interaction is valid."""
-        return inter.author.id == self.author_id
-
-    @disnake.ui.button(emoji=TICK, style=disnake.ButtonStyle.secondary)
-    async def confirm_button(self, _: disnake.ui.Button, interaction: disnake.MessageInteraction) -> None:
-        """Confirm button."""
-        text = f"Confirmed {TICK}"
-        self.confirm = True
-        self.clear_items()
-
-        await interaction.response.edit_message(text, view=self)
-        self.stop()
-
-    @disnake.ui.button(emoji=CROSS, style=disnake.ButtonStyle.secondary)
-    async def rejection_button(self, _: disnake.ui.Button, interaction: disnake.MessageInteraction) -> None:
-        """Reject button."""
-        text = f"Rejected {CROSS}"
-        self.confirm = False
-        self.clear_items()
-
-        await interaction.response.edit_message(text, view=self)
-        self.stop()
+        await inter.edit_original_message("Click the button to play your turn.", view=view, attachments=[])
 
 
 def setup(bot: commands.Bot) -> None:
