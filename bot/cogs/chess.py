@@ -636,10 +636,7 @@ class TurnDropdown(disnake.ui.StringSelect):
         self.board = board
         self.active_tile_num = board.active_tiles
         if chosen_tile_num is not None:
-            print(board[chosen_tile_num], "Chosen Tile")
             self.active_tile_num.remove(board[chosen_tile_num])
-
-        print(self.active_tile_num, "Active Tiles")
 
         if label in ["Tile", "2nd Tile"]:
             lst_to_iter: list[ActiveTile] = self.active_tile_num
@@ -671,6 +668,8 @@ class TurnDropdown(disnake.ui.StringSelect):
             for i, _c in enumerate(self.view.children):
                 if i > 0:
                     self.view.remove_item(_c)
+
+            self.placeholder = f"Tile Chosen: {_cords+1}"
             self.view.add_item(TurnDropdown("Dot", self.board, self.board[self.view.tile_cords].dots_not_found))
             await inter.response.edit_message(view=self.view)
 
@@ -688,6 +687,7 @@ class TurnDropdown(disnake.ui.StringSelect):
             for i, _c in enumerate(self.view.children):
                 if i > 0:
                     self.view.remove_item(_c)
+            self.placeholder = f"2nd Tile Chosen: {_cords + 1}"
             self.view.add_item(TurnDropdown("2nd Dot", self.board, self.board[self.view.tile_cords_2].dots_not_found))
             await inter.response.edit_message(view=self.view)
 
@@ -714,6 +714,7 @@ class TurnView(disnake.ui.View):
 
     async def finish_view(self, inter: disnake.MessageInteraction) -> None:
         """Finish the view."""
+        print(self.msg_id, self.tile_cords, self.tile_cords_2, self.dot_cords, self.dot_cords_2)
         self.clear_items()
 
         match_check, dot_1, dot_2 = game_flow.match_dot(
@@ -757,6 +758,7 @@ class MainView(disnake.ui.View):
             return
 
         view = TurnView(board, msg_id=inter.message.id)
+        print(view.msg_id, "Message ID")
         self.play_turn.disabled = True
         self.play_turn.label = "Player Choosing tiles"
         self.play_turn.style = disnake.ButtonStyle.grey
@@ -777,7 +779,7 @@ class MainView(disnake.ui.View):
         self.play_turn.label = "Play Turn"
         self.play_turn.disabled = False
         self.play_turn.style = disnake.ButtonStyle.green
-        await inter.message.edit("Click the button to play your turn.", view=self, attachments=[])
+        await inter.message.edit("Click the button to play your turn.", view=self)
 
 
 class ChessCog(commands.Cog):
@@ -818,10 +820,15 @@ class ChessCog(commands.Cog):
             user=inter.author,
             opponent=None,
         )
-        await inter.edit_original_message(f"This is your board. Look carefully \n\nDebug: {board}", file=board_img)
+        await inter.edit_original_message(
+            "This is your board. Look at it carefully, this will be the last time you can see the numbers!",
+            file=board_img,
+        )
         await asyncio.sleep(TIME_REMEMBER * (10 - difficulty))
         view = MainView()
-        await inter.edit_original_message("Click the button to play your turn.", view=view, attachments=[])
+        await inter.edit_original_message(
+            "Click the button to play your turn.", view=view, file=board.hidden_image(), attachments=[]
+        )
 
 
 def setup(bot: commands.Bot) -> None:
