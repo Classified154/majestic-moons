@@ -199,7 +199,7 @@ class ActiveTile(Tile):
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, ActiveTile):
-            return any(self_dot.num == other_dot.num for self_dot in self._dots for other_dot in other)
+            return self.num == other.num
 
         return NotImplemented
 
@@ -241,7 +241,7 @@ class ActiveTile(Tile):
 
     def set_dot_found(self, position: int) -> None:
         """Mark a dot as found."""
-        self.dots_found[position].found = True
+        self.dots_not_found[position].found = True
 
 
 class Board:
@@ -404,6 +404,8 @@ class Board:
         for tile_num in moved_tiles:
             self[tile_num].is_moved = True
 
+        self._tiles.sort(key=lambda x: x.num)
+
     def _get_dot_positions(self, num_dots: int, width: int, height: int) -> list[tuple[int, int]]:
         """Get the dot positions based on the number of dots to spawn."""
         if num_dots == 3:  # noqa: PLR2004
@@ -529,9 +531,9 @@ class Board:
         self._make_tiles()
         return self._generate_board_img(NumberStatus.VISIBLE)
 
-    def debug_image(self) -> disnake.File:
+    def hidden_image(self) -> disnake.File:
         """Make the board."""
-        return self._generate_board_img(NumberStatus.VISIBLE)
+        return self._generate_board_img(NumberStatus.HIDDEN)
 
 
 class GameFlow:
@@ -627,17 +629,31 @@ game_flow: GameFlow = GameFlow()
 class TurnDropdown(disnake.ui.StringSelect):
     """A dropdown that lets user choose from tile and dot coordinates."""
 
-    def __init__(self, label: str, board: Board, dot_list: list[Dot] | None = None) -> None:
+    def __init__(
+        self, label: str, board: Board, dot_list: list[Dot] | None = None, chosen_tile_num: int | None = None
+    ) -> None:
         self.label = label
         self.board = board
-        lst_to_iter: list = board.active_tiles if label in ["Tile", "2nd Tile"] else dot_list
+        self.active_tile_num = board.active_tiles
+        if chosen_tile_num is not None:
+            print(board[chosen_tile_num], "Chosen Tile")
+            self.active_tile_num.remove(board[chosen_tile_num])
 
-        options = [
-            *(
-                disnake.SelectOption(label=f"{_index + 1}", value=f"{_index + 1}")
-                for _index in range(len(lst_to_iter))
-            ),
-        ]
+        print(self.active_tile_num, "Active Tiles")
+
+        if label in ["Tile", "2nd Tile"]:
+            lst_to_iter: list[ActiveTile] = self.active_tile_num
+            options = [
+                *(disnake.SelectOption(label=f"{a.num + 1}", value=f"{a.num}") for a in lst_to_iter),
+            ]
+        else:
+            lst_to_iter: list[Dot] = dot_list
+            options = [
+                *(
+                    disnake.SelectOption(label=f"{_index + 1}", value=f"{_index}")
+                    for _index in range(len(lst_to_iter))
+                ),
+            ]
 
         super().__init__(
             placeholder=f"Choose a {label}",
@@ -648,7 +664,7 @@ class TurnDropdown(disnake.ui.StringSelect):
 
     async def callback(self, inter: disnake.MessageInteraction) -> None:
         """Dropdown callback."""
-        _cords = int(inter.resolved_values[0]) - 1
+        _cords = int(inter.resolved_values[0])
 
         if self.label == "Tile":
             self.view.tile_cords = _cords
@@ -661,7 +677,10 @@ class TurnDropdown(disnake.ui.StringSelect):
         elif self.label == "Dot":
             self.view.dot_cords = _cords
             self.view.clear_items()
-            self.view.add_item(TurnDropdown("2nd Tile", self.board))
+            self.view.add_item(
+                TurnDropdown("2nd Tile", self.board, chosen_tile_num=self.board[self.view.tile_cords].num)
+            )
+            print(self.board[self.view.tile_cords].num, "Tile 1 NUmber")
             await inter.response.edit_message(view=self.view)
 
         elif self.label == "2nd Tile":
@@ -740,6 +759,7 @@ class MainView(disnake.ui.View):
         view = TurnView(board, msg_id=inter.message.id)
         self.play_turn.disabled = True
         self.play_turn.label = "Player Choosing tiles"
+        self.play_turn.style = disnake.ButtonStyle.grey
         await inter.message.edit(view=self)
         await inter.response.send_message(view=view, ephemeral=True)
 
@@ -748,9 +768,16 @@ class MainView(disnake.ui.View):
             await inter.message.edit(content="# Dots Matched! Congratulations!", view=self)
             await asyncio.sleep(4)
 
+        self.play_turn.label = "Moving Tiles"
+        self.play_turn.disabled = True
+        self.play_turn.style = disnake.ButtonStyle.blurple
+        await inter.message.edit("Tiles have moved!", view=self, file=board.hidden_image(), attachments=[])
+        await asyncio.sleep(5)
+
         self.play_turn.label = "Play Turn"
         self.play_turn.disabled = False
-        await inter.message.edit(view=self, file=board.debug_image(), attachments=[])
+        self.play_turn.style = disnake.ButtonStyle.green
+        await inter.message.edit("Click the button to play your turn.", view=self, attachments=[])
 
 
 class ChessCog(commands.Cog):
