@@ -279,6 +279,7 @@ class Board:
         }
         self.ROCK_SIZE: tuple[int, int] = (40, 40)
         self.font = ImageFont.truetype("../assets/arial.ttf", 18)
+        self.tiles_moved: list[int, int] = []
 
         # Load raft images
         self.raft_images = []
@@ -391,8 +392,11 @@ class Board:
         moved_tiles = []
         for tile in self._empty_tiles:
             chosen_tile = random.choice(self._find_movable(tile))  # noqa: S311
+            self.tiles_moved = [chosen_tile.num, tile.num]
+
             temp_tile = chosen_tile.num
             chosen_tile.num = tile.num
+
             tile.num = temp_tile
             chosen_tile.is_moved = True
             moved_tiles.append(chosen_tile.num)
@@ -643,7 +647,9 @@ class TurnDropdown(disnake.ui.StringSelect):
             options = [
                 *(disnake.SelectOption(label=f"{a.num + 1}", value=f"{a.num}") for a in lst_to_iter),
             ]
+            obj = label.replace("Tile", "Raft")
         else:
+            obj = label.replace("Dot", "Rock")
             lst_to_iter: list[Dot] = dot_list
             options = [
                 *(
@@ -653,7 +659,7 @@ class TurnDropdown(disnake.ui.StringSelect):
             ]
 
         super().__init__(
-            placeholder=f"Choose a {label}",
+            placeholder=f"Choose a {obj}",
             max_values=1,
             options=options,
             custom_id=f"{label.lower()}_dropdown",
@@ -723,15 +729,11 @@ class TurnView(disnake.ui.View):
         if match_check:
             game_flow.win_check(self.msg_id)
             self.matched = True
-            await inter.response.edit_message(
-                f"You chose-" f"{dot_1}" f"{dot_2}",
-                view=self,
-            )
-        else:
-            await inter.response.edit_message(
-                f"You chose-" f"{dot_1}" f"{dot_2}",
-                view=self,
-            )
+
+        await inter.response.edit_message(
+            f"You chose {dot_1.num} and {dot_2.num}",
+            view=self,
+        )
 
         self.board.change_turn()
         self.board.move_tiles()
@@ -758,9 +760,9 @@ class MainView(disnake.ui.View):
             return
 
         view = TurnView(board, msg_id=inter.message.id)
-        print(view.msg_id, "Message ID")
+        print(view.msg_id, view.board, "Message ID")
         self.play_turn.disabled = True
-        self.play_turn.label = "Player Choosing tiles"
+        self.play_turn.label = "Player Picking  Rocks"
         self.play_turn.style = disnake.ButtonStyle.grey
         await inter.message.edit(view=self)
         await inter.response.send_message(view=view, ephemeral=True)
@@ -770,10 +772,10 @@ class MainView(disnake.ui.View):
             await inter.message.edit(content="# Dots Matched! Congratulations!", view=self)
             await asyncio.sleep(4)
 
-        self.play_turn.label = "Moving Tiles"
+        self.play_turn.label = f"{board.tiles_moved[0]} Raft Moved to {board.tiles_moved[1]}"
         self.play_turn.disabled = True
         self.play_turn.style = disnake.ButtonStyle.blurple
-        await inter.message.edit("Tiles have moved!", view=self, file=board.hidden_image(), attachments=[])
+        await inter.message.edit("Rafts have moved!", view=self, file=board.hidden_image(), attachments=[])
         await asyncio.sleep(5)
 
         self.play_turn.label = "Play Turn"
