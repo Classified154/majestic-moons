@@ -161,11 +161,6 @@ class Tile:
         return self._empty == TileStatus.EMPTY
 
     @property
-    def all_found(self) -> bool:
-        """Return if all dots on the tile are found."""
-        return self._all_found
-
-    @property
     def num(self) -> int:
         """Return the number."""
         return self._num
@@ -685,24 +680,40 @@ class TurnView(disnake.ui.View):
         self.dot_cords = 0
         self.tile_cords_2 = 0
         self.dot_cords_2 = 0
+
         self.board = board
         self.msg_id = msg_id
+
+        self.matched = False
         self.add_item(TurnDropdown("Tile", board))
 
     async def finish_view(self, inter: disnake.MessageInteraction) -> None:
         """Finish the view."""
         self.clear_items()
         self.stop()
-        # Process inputs here
 
-        await inter.response.edit_message(
-            f"Tile coordinates: {self.tile_cords}, Dot coordinates: {self.dot_cords}, "
-            f"Dot you selected is {game_flow[self.msg_id][int(self.tile_cords)][int(self.dot_cords)]}",
-            view=self,
+        match_check = game_flow.match_dot(
+            self.msg_id, self.tile_cords, self.tile_cords_2, self.dot_cords, self.dot_cords_2
         )
-        # Update the board
-        # Check if the game is over
-        # Change the turn
+        if match_check:
+            game_flow.win_check(self.msg_id)
+            self.matched = True
+            await inter.response.edit_message(
+                f"You chose-"
+                f"T- {self.tile_cords}, D- {self.dot_cords}, "
+                f"T2- {self.tile_cords_2}, D2- {self.dot_cords_2}, "
+                f"## Matched!",
+                view=self,
+            )
+        else:
+            await inter.response.edit_message(
+                f"You chose-"
+                f"T- {self.tile_cords}, D- {self.dot_cords}, "
+                f"T2- {self.tile_cords_2}, D2- {self.dot_cords_2}, "
+                f"## Not Matched!",
+                view=self,
+            )
+
         self.board.change_turn()
 
 
@@ -727,11 +738,16 @@ class MainView(disnake.ui.View):
 
         view = TurnView(board, msg_id=inter.message.id)
         self.play_turn.disabled = True
+        self.play_turn.label = "Player Choosing tiles"
         await inter.message.edit(view=self)
         await inter.response.send_message(view=view, ephemeral=True)
 
         await view.wait()
+        if view.matched:
+            await inter.message.edit(content="# Dots Matched! Congratulations!", view=self)
+            await asyncio.sleep(4)
 
+        self.play_turn.label = "Play Turn"
         self.play_turn.disabled = False
         await inter.message.edit(view=self)
 
@@ -764,7 +780,7 @@ class ChessCog(commands.Cog):
     @commands.slash_command()
     @commands.default_member_permissions(administrator=True)
     async def game(self, inter: disnake.MessageCommandInteraction, difficulty: GameDifficulty) -> None:  # noqa: D417
-        """Start a game against the computer.
+        """Start a game against the bot.
 
         Parameters
         ----------
@@ -780,11 +796,8 @@ class ChessCog(commands.Cog):
             user=inter.author,
             opponent=None,
         )
-        await inter.edit_original_message(f"This is your board. Look carefully \n\nDebug:{board}")
-
-        message = await inter.channel.send(file=board_img)
+        await inter.edit_original_message(f"This is your board. Look carefully \n\nDebug:{board}", file=board_img)
         await asyncio.sleep(TIME_REMEMBER)
-        await message.delete()
         view = MainView()
         await inter.edit_original_message("Click the button to play your turn.", view=view)
 
