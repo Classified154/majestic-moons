@@ -10,6 +10,7 @@ from pathlib import Path
 import disnake
 from disnake.ext import commands
 from PIL import Image, ImageDraw, ImageFont
+from utils.logging_utils import log
 
 TICK = "✅"
 CROSS = "❌"
@@ -360,6 +361,8 @@ class Board:
             self._user.turn = True
             self._opponent.turn = False
 
+        log(self._user.user_id, "Game", f"Turn switched to {self.current_player.username}")
+
     def _find_movable(self, tile: Tile) -> list[ActiveTile]:
         """Return the index of all adjacent tiles."""
         adjacent_tiles = []
@@ -400,7 +403,6 @@ class Board:
             tile.num = temp_tile
             chosen_tile.is_moved = True
             moved_tiles.append(chosen_tile.num)
-            print()
 
         for tile in self.all_tiles:
             if not tile.is_empty:
@@ -495,11 +497,16 @@ class Board:
 
     def _generate_board_img(self, numbers_visible: NumberStatus) -> disnake.File:
         """Generate the board image as an animated GIF."""
-        print("Generating board image")
+        log(self._user.user_id, "Game", "Generating board image")
         try:
-            print(f"Board size: {self._board_size}")
-            print(f"Number of tiles: {len(self._tiles)}")
-            print(f"Number of active tiles: {sum(1 for tile in self._tiles if isinstance(tile, ActiveTile))}")
+            log(self._user.user_id, "Game", f"Board size: {self._board_size}")
+            log(self._user.user_id, "Game", f"Number of tiles: {len(self._tiles)}")
+            log(
+                self._user.user_id,
+                "Game",
+                f"Number of active tiles: {sum(1 for tile in self._tiles if isinstance(tile, ActiveTile))}",
+            )
+
             frames = [self._create_board_frame(raft_image, numbers_visible) for raft_image in self.raft_images]
 
             buffer = BytesIO()
@@ -509,6 +516,9 @@ class Board:
             return disnake.File(fp=buffer, filename="board.gif")
         except Exception as e:  # noqa: BLE001
             print(f"An error occurred while generating the board image: {e!s}")
+            log(
+                self._user.user_id, "Game", f"An error occurred while generating the board image: {e!s}", level="ERROR"
+            )
 
     def _make_tiles(self) -> None:
         total_num = ((self._total_spaces - self._empty_spaces) * self._num_stones) // 2
@@ -520,7 +530,7 @@ class Board:
                 empty_tile = EmptyTile(i)
                 self._tiles.append(empty_tile)
                 self._empty_tiles.append(empty_tile)
-                print(f"Empty tile {i} added")
+
             else:
                 dot_numbers = select_unique_numbers(paired_num, self._num_stones)
                 self._tiles.append(ActiveTile(i, dot_numbers))
@@ -528,7 +538,7 @@ class Board:
                 for num in dot_numbers:
                     paired_num.remove(num)
 
-                print(f"Active tile {i} added")
+        log(self._user.user_id, "Game", f"Tiles created successfully - {self._tiles}")
 
     def make_board(self) -> disnake.File:
         """Make the board."""
@@ -591,6 +601,7 @@ class GameFlow:
         )
         board_img = board.make_board()
         self._boards.append(board)
+        log(user.id, "Game", f"Game started with {opponent.name if opponent else 'Bot'}")
         return board, board_img
 
     def match_dot(
@@ -613,7 +624,6 @@ class GameFlow:
                 dot_2 = d
                 break
 
-        print(dot_1, dot_2)
         if dot_1 == dot_2:
             board[tile1_num].set_dot_found(dot1_num)
             board[tile2_num].set_dot_found(dot2_num)
@@ -675,9 +685,10 @@ class TurnDropdown(disnake.ui.StringSelect):
                 if i > 0:
                     self.view.remove_item(_c)
 
-            self.placeholder = f"Tile Chosen: {_cords+1}"
+            self.placeholder = f"Tile Chosen: {_cords + 1}"
             self.view.add_item(TurnDropdown("Dot", self.board, self.board[self.view.tile_cords].dots_not_found))
             await inter.response.edit_message(view=self.view)
+            log(inter.author.id, "Game", f"Player chose tile {_cords}: {self.board[self.view.tile_cords]}")
 
         elif self.label == "Dot":
             self.view.dot_cords = _cords
@@ -685,8 +696,8 @@ class TurnDropdown(disnake.ui.StringSelect):
             self.view.add_item(
                 TurnDropdown("2nd Tile", self.board, chosen_tile_num=self.board[self.view.tile_cords].num)
             )
-            print(self.board[self.view.tile_cords].num, "Tile 1 NUmber")
             await inter.response.edit_message(view=self.view)
+            log(inter.author.id, "Game", f"Player chose dot {_cords}")
 
         elif self.label == "2nd Tile":
             self.view.tile_cords_2 = _cords
@@ -696,10 +707,12 @@ class TurnDropdown(disnake.ui.StringSelect):
             self.placeholder = f"2nd Tile Chosen: {_cords + 1}"
             self.view.add_item(TurnDropdown("2nd Dot", self.board, self.board[self.view.tile_cords_2].dots_not_found))
             await inter.response.edit_message(view=self.view)
+            log(inter.author.id, "Game", f"Player chose 2nd tile {_cords}: {self.board[self.view.tile_cords_2]}")
 
         else:
             self.view.dot_cords_2 = _cords
             await self.view.finish_view(inter)
+            log(inter.author.id, "Game", f"Player chose 2nd dot {_cords}")
 
 
 class TurnView(disnake.ui.View):
@@ -716,18 +729,18 @@ class TurnView(disnake.ui.View):
         self.msg_id = msg_id
 
         self.matched = False
+        self.won = False
         self.add_item(TurnDropdown("Tile", board))
 
     async def finish_view(self, inter: disnake.MessageInteraction) -> None:
         """Finish the view."""
-        print(self.msg_id, self.tile_cords, self.tile_cords_2, self.dot_cords, self.dot_cords_2)
         self.clear_items()
 
         match_check, dot_1, dot_2 = game_flow.match_dot(
             self.msg_id, self.tile_cords, self.tile_cords_2, self.dot_cords, self.dot_cords_2
         )
         if match_check:
-            game_flow.win_check(self.msg_id)
+            self.won = game_flow.win_check(self.msg_id)
             self.matched = True
 
         await inter.response.edit_message(
@@ -737,6 +750,7 @@ class TurnView(disnake.ui.View):
 
         self.board.change_turn()
         self.board.move_tiles()
+        log(inter.author.id, "Game", f"Turn ended: {dot_1}, {dot_2}")
         self.stop()
 
 
@@ -760,7 +774,7 @@ class MainView(disnake.ui.View):
             return
 
         view = TurnView(board, msg_id=inter.message.id)
-        print(view.msg_id, view.board, "Message ID")
+        log(inter.author.id, "Game", f"Player {player.username} is playing their turn")
         self.play_turn.disabled = True
         self.play_turn.label = "Player Picking  Rocks"
         self.play_turn.style = disnake.ButtonStyle.grey
@@ -770,18 +784,27 @@ class MainView(disnake.ui.View):
         await view.wait()
         if view.matched:
             await inter.message.edit(content="# Dots Matched! Congratulations!", view=self)
+            log(inter.author.id, "Game", f"Player {player.username} matched the dots")
             await asyncio.sleep(4)
+
+        if view.won:
+            await inter.message.edit(
+                content="# You Won! Congratulations!", view=None, file=board.hidden_image(), attachments=[]
+            )
+            return
 
         self.play_turn.label = f"{board.tiles_moved[0]} Raft Moved to {board.tiles_moved[1]}"
         self.play_turn.disabled = True
         self.play_turn.style = disnake.ButtonStyle.blurple
         await inter.message.edit("Rafts have moved!", view=self, file=board.hidden_image(), attachments=[])
+        log(inter.author.id, "Game", f"Raft moved from {board.tiles_moved[0]} to {board.tiles_moved[1]}")
         await asyncio.sleep(5)
 
         self.play_turn.label = "Play Turn"
         self.play_turn.disabled = False
         self.play_turn.style = disnake.ButtonStyle.green
         await inter.message.edit("Click the button to play your turn.", view=self)
+        log(inter.author.id, "Game", "Player's turn ended")
 
 
 class ChessCog(commands.Cog):
@@ -800,7 +823,7 @@ class ChessCog(commands.Cog):
             self.persistence_views = True
 
         await self.bot.change_presence(
-            activity=disnake.Activity(type=disnake.ActivityType.playing, name="with chess pieces"),
+            activity=disnake.Activity(type=disnake.ActivityType.playing, name="with rock N raft"),
         )
 
     @commands.slash_command()
