@@ -8,7 +8,7 @@ This game consists of a 3x3 river grid with 8 rafts and 1 empty space. The rafts
 This is a game all about information, remember it and save the rafts from sinking by finding the matching numbered stones and throwing into the river!
 
 ### **Usage**
-To setup the bot, make a ".env" file and put `BOT_TOKEN=<your_token>` in it and replace the id in [test_guilds](https://github.com/Classified154/majestic-moons/blob/main/bot/bot.py#L77) with your servers id. To start the bot, run the `bot.py` file.
+To setup the bot, make a `.env` file and put `BOT_TOKEN=<your_token>` in it and replace the id in [test_guilds](https://github.com/Classified154/majestic-moons/blob/main/bot/bot.py#L77) with your servers id. To start the bot, run the `bot.py` file.
 
 The command to start a game is `/game`, it has three difficulty settings; easy, medium and hard with the rafts carrying 3, 4 and 5 numbered stones respectively.
 
@@ -29,8 +29,7 @@ Then one of the rafts adjacent to the empty space is shifted in it.
 
 
 And then it repeats and the player has to find pairs until they win.  
-<win_image>
-
+Win image? Well... win a game and see it yourself!
 
 ### **Theme relevancy**
 When a game starts, the player is dumped with the information on the position of the numbers which they have to remember to eventually find the pairs, so an initial information dump, which gradually increases as the game progresses because after every turn, a raft moves, hence the player has to keep track of the position of the numbers. Combining both, we get "Information Overload", this year's [code jam](https://www.pythondiscord.com/events/code-jams/11) theme.
