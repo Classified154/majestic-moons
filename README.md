@@ -18,7 +18,7 @@ Next, the player has to select a pair using the dropdown menu.
 ![image](https://github.com/user-attachments/assets/24f2d2ba-a71e-49ac-b4af-4a18625c2515)
 
 
-After selecting the pair, the player is shown what stones they selected and whether the numbers on them match or not.  
+After selecting the pair, the player is shown the numbers on the stones they selected and whether they match or not.  
 ![image](https://github.com/user-attachments/assets/e9b5fa50-7f5f-4662-abb9-460407bf7f2d)
 
 
@@ -28,9 +28,7 @@ Then one of the rafts adjacent to the empty space is shifted in it.
 
 And then it repeats and the player has to find pairs until they win.  
 Win image? Well... win a game and see it yourself!
-
-
-
+&nbsp;&nbsp;&nbsp;
 ***INFO: Rafts and stones numbering.***  
 Rafts:  
 ![image](https://github.com/user-attachments/assets/5420d099-2fab-4c2a-9522-64bef558a282)
