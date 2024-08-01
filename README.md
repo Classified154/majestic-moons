@@ -32,7 +32,7 @@ And then it repeats and the player has to find pairs until they win.
 Win image? Well... win a game and see it yourself!
 
 
-INFO: Rafts and stones numbering.  
+***INFO: Rafts and stones numbering.***  
 Rafts:  
 ![image](https://github.com/user-attachments/assets/5420d099-2fab-4c2a-9522-64bef558a282)
 
