@@ -16,7 +16,7 @@ Initially the board is shown to the player for some time to look at it and remem
 ![image](https://github.com/user-attachments/assets/131a5f83-9073-4d3d-b4fd-493639315a0c)
 
 
-Next the player has to select a pair using the dropdown menu.  
+Next, the player has to select a pair using the dropdown menu.  
 ![image](https://github.com/user-attachments/assets/24f2d2ba-a71e-49ac-b4af-4a18625c2515)
 
 
@@ -30,6 +30,7 @@ Then one of the rafts adjacent to the empty space is shifted in it.
 
 And then it repeats and the player has to find pairs until they win.  
 Win image? Well... win a game and see it yourself!
+
 
 
 ***INFO: Rafts and stones numbering.***  
