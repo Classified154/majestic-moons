@@ -1,7 +1,5 @@
 # Majestic Moons
 
----
-
 ### **Project Description**
 This game consists of a 3x3 river grid with 8 rafts and 1 empty space. The rafts have numbered stones on them, with the stones numbered in pairs and evenly distributed over the rafts. At the start of the game, the board is shown for a short time before the numbers are hidden. The goal is to find matching numbered stones. Each turn, one of the rafts adjacent to the empty space moves into it, taking the stones with it to new positions.
 
