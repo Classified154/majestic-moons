@@ -31,6 +31,16 @@ Then one of the rafts adjacent to the empty space is shifted in it.
 And then it repeats and the player has to find pairs until they win.  
 Win image? Well... win a game and see it yourself!
 
+
+INFO: Rafts and stones numbering.  
+Rafts:  
+![image](https://github.com/user-attachments/assets/5420d099-2fab-4c2a-9522-64bef558a282)
+
+
+Rocks:  
+![image](https://github.com/user-attachments/assets/15c201f5-c306-4efd-a4fd-6c6f7ce5f510)
+
+
 ### **Theme relevancy**
 When a game starts, the player is dumped with the information on the position of the numbers which they have to remember to eventually find the pairs, so an initial information dump, which gradually increases as the game progresses because after every turn, a raft moves, hence the player has to keep track of the position of the numbers. Combining both, we get "Information Overload", this year's [code jam](https://www.pythondiscord.com/events/code-jams/11) theme.
 
